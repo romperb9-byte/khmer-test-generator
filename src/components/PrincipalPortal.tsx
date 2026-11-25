@@ -13,10 +13,13 @@ import {
   CheckCircle2,
   Eye,
   EyeOff,
-  AlertCircle
+  AlertCircle,
+  Camera,
+  KeyRound,
+  FolderOpen
 } from 'lucide-react';
 import { saveAs } from 'file-saver';
-import { School, SavedTest, StudentSubmission, SubjectItem } from '../types';
+import { School, SavedTest, StudentSubmission, SubjectItem, GeneratedTest } from '../types';
 import {
   fetchTests,
   updateTestSettings,
@@ -24,24 +27,41 @@ import {
   fetchSubmissions,
   fetchSubjects,
   addSubject,
-  deleteSubject
+  deleteSubject,
+  updateSchool
 } from '../services/dbService';
+import { OmrScanner } from './OmrScanner';
 
 interface PrincipalPortalProps {
   school: School;
+  currentTest?: GeneratedTest | null;
   onSubjectsChanged?: () => void;
+  onSchoolUpdated?: (updated: School) => void;
+  onLoadTestToGenerator?: (test: SavedTest) => void;
 }
 
-export const PrincipalPortal: React.FC<PrincipalPortalProps> = ({ school, onSubjectsChanged }) => {
+export const PrincipalPortal: React.FC<PrincipalPortalProps> = ({
+  school,
+  currentTest = null,
+  onSubjectsChanged,
+  onSchoolUpdated,
+  onLoadTestToGenerator
+}) => {
   const [unlocked, setUnlocked] = useState(false);
   const [passcode, setPasscode] = useState('');
   const [authError, setAuthError] = useState<string | null>(null);
 
-  const [activeTab, setActiveTab] = useState<'tests' | 'scores' | 'subjects'>('tests');
+  const [activeTab, setActiveTab] = useState<'tests' | 'omr' | 'scores' | 'subjects' | 'codes'>('tests');
   const [tests, setTests] = useState<SavedTest[]>([]);
   const [submissions, setSubmissions] = useState<StudentSubmission[]>([]);
   const [subjects, setSubjects] = useState<SubjectItem[]>([]);
   const [loading, setLoading] = useState(false);
+
+  // Access Codes state
+  const [teacherCode, setTeacherCode] = useState(school.teacher_code || '1111');
+  const [studentCode, setStudentCode] = useState(school.student_code || '2222');
+  const [codesSavedMsg, setCodesSavedMsg] = useState<string | null>(null);
+  const [codesError, setCodesError] = useState<string | null>(null);
 
   // Filters
   const [testGradeFilter, setTestGradeFilter] = useState('ទាំងអស់');
@@ -121,6 +141,27 @@ export const PrincipalPortal: React.FC<PrincipalPortalProps> = ({ school, onSubj
     await deleteSubject(id);
     setSubjects(prev => prev.filter(s => s.id !== id));
     onSubjectsChanged?.();
+  };
+
+  const handleSaveCodes = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setCodesError(null);
+    setCodesSavedMsg(null);
+    if (!teacherCode.trim() || !studentCode.trim()) {
+      setCodesError('សូមបញ្ចូលលេខកូដគ្រូ និងលេខកូដសិស្ស!');
+      return;
+    }
+    try {
+      const updated = await updateSchool(school.id, {
+        teacher_code: teacherCode.trim(),
+        student_code: studentCode.trim(),
+      });
+      onSchoolUpdated?.(updated);
+      setCodesSavedMsg('បានរក្សាទុកលេខកូដថ្មីដោយជោគជ័យ!');
+      setTimeout(() => setCodesSavedMsg(null), 3000);
+    } catch (err) {
+      setCodesError(err instanceof Error ? err.message : 'មិនអាចរក្សាទុកលេខកូដបានទេ (សូមពិនិត្យថាបានបន្ថែម column teacher_code/student_code ក្នុង Supabase)');
+    }
   };
 
   const filteredTests = tests.filter(t => {
@@ -233,16 +274,25 @@ export const PrincipalPortal: React.FC<PrincipalPortalProps> = ({ school, onSubj
           <div className="flex flex-wrap items-center gap-2">
             <button
               onClick={() => setActiveTab('tests')}
-              className={`px-4 py-2 rounded-xl text-xs font-bold flex items-center gap-1.5 cursor-pointer transition-all ${
+              className={`px-3.5 py-2 rounded-xl text-xs font-bold flex items-center gap-1.5 cursor-pointer transition-all ${
                 activeTab === 'tests' ? 'bg-indigo-600 text-white shadow-sm' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
               }`}
             >
-              <FileText className="w-4 h-4" />
-              <span>វិញ្ញាសា ({tests.length})</span>
+              <FolderOpen className="w-4 h-4" />
+              <span>ឃ្លាំងវិញ្ញាសា ({tests.length})</span>
+            </button>
+            <button
+              onClick={() => setActiveTab('omr')}
+              className={`px-3.5 py-2 rounded-xl text-xs font-bold flex items-center gap-1.5 cursor-pointer transition-all ${
+                activeTab === 'omr' ? 'bg-indigo-600 text-white shadow-sm' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+              }`}
+            >
+              <Camera className="w-4 h-4" />
+              <span>ស្កែន OMR</span>
             </button>
             <button
               onClick={() => setActiveTab('scores')}
-              className={`px-4 py-2 rounded-xl text-xs font-bold flex items-center gap-1.5 cursor-pointer transition-all ${
+              className={`px-3.5 py-2 rounded-xl text-xs font-bold flex items-center gap-1.5 cursor-pointer transition-all ${
                 activeTab === 'scores' ? 'bg-indigo-600 text-white shadow-sm' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
               }`}
             >
@@ -251,12 +301,21 @@ export const PrincipalPortal: React.FC<PrincipalPortalProps> = ({ school, onSubj
             </button>
             <button
               onClick={() => setActiveTab('subjects')}
-              className={`px-4 py-2 rounded-xl text-xs font-bold flex items-center gap-1.5 cursor-pointer transition-all ${
+              className={`px-3.5 py-2 rounded-xl text-xs font-bold flex items-center gap-1.5 cursor-pointer transition-all ${
                 activeTab === 'subjects' ? 'bg-indigo-600 text-white shadow-sm' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
               }`}
             >
               <BookOpen className="w-4 h-4" />
               <span>មុខវិជ្ជា ({subjects.length})</span>
+            </button>
+            <button
+              onClick={() => setActiveTab('codes')}
+              className={`px-3.5 py-2 rounded-xl text-xs font-bold flex items-center gap-1.5 cursor-pointer transition-all ${
+                activeTab === 'codes' ? 'bg-indigo-600 text-white shadow-sm' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+              }`}
+            >
+              <KeyRound className="w-4 h-4" />
+              <span>កំណត់លេខកូដ</span>
             </button>
             <button
               onClick={loadAllData}
@@ -344,10 +403,19 @@ export const PrincipalPortal: React.FC<PrincipalPortalProps> = ({ school, onSubj
                               <span>{t.show_score_immediately ? 'បង្ហាញភ្លាមៗ' : 'លាក់ពិន្ទុ'}</span>
                             </button>
                           </td>
-                          <td className="p-4 text-right">
+                          <td className="p-4 text-right space-x-1">
+                            {onLoadTestToGenerator && (
+                              <button
+                                onClick={() => onLoadTestToGenerator(t)}
+                                className="px-2.5 py-1.5 bg-blue-50 hover:bg-blue-100 text-blue-700 rounded-lg text-xs font-bold cursor-pointer"
+                                title="បើកមើល / Export Word, CSV, OMR"
+                              >
+                                បើកមើល
+                              </button>
+                            )}
                             <button
                               onClick={() => handleDeleteTest(t.id, t.title)}
-                              className="p-2 hover:bg-rose-50 text-rose-500 rounded-xl cursor-pointer"
+                              className="p-2 hover:bg-rose-50 text-rose-500 rounded-xl cursor-pointer inline-flex align-middle"
                               title="លុបវិញ្ញាសា"
                             >
                               <Trash2 className="w-4 h-4" />
@@ -360,6 +428,74 @@ export const PrincipalPortal: React.FC<PrincipalPortalProps> = ({ school, onSubj
                 </div>
               </div>
             )}
+          </div>
+        )}
+
+        {/* TAB OMR SCANNER */}
+        {activeTab === 'omr' && (
+          <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden shadow-sm">
+            <OmrScanner currentTest={currentTest} onBack={() => setActiveTab('tests')} />
+          </div>
+        )}
+
+        {/* TAB ACCESS CODES */}
+        {activeTab === 'codes' && (
+          <div className="bg-white rounded-2xl border border-slate-200 p-6 shadow-sm space-y-6 max-w-xl">
+            <div>
+              <h3 className="font-extrabold text-slate-900 text-base flex items-center gap-2">
+                <KeyRound className="w-5 h-5 text-indigo-600" />
+                <span>កំណត់លេខកូដចូលសម្រាប់គ្រូ និងសិស្ស</span>
+              </h3>
+              <p className="text-xs text-slate-500 mt-1">
+                នាយកសាលាជាអ្នកកំណត់លេខកូដទាំង ២ នេះ ដើម្បីឱ្យគ្រូចូលបង្កើតតេស្ដ និងសិស្សចូលធ្វើតេស្ដ។
+              </p>
+            </div>
+
+            <form onSubmit={handleSaveCodes} className="space-y-4">
+              <div>
+                <label className="block text-xs font-bold text-slate-700 mb-1.5">
+                  លេខកូដចូល "បង្កើតតេស្ដ" (សម្រាប់គ្រូបង្រៀន)
+                </label>
+                <input
+                  type="text"
+                  value={teacherCode}
+                  onChange={(e) => setTeacherCode(e.target.value)}
+                  placeholder="ឧ. 1111"
+                  className="w-full px-4 py-2.5 border border-slate-200 rounded-xl text-sm font-mono focus:outline-none focus:border-indigo-500"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-slate-700 mb-1.5">
+                  លេខកូដចូល "តេស្ដសិស្ស" (សម្រាប់សិស្ស)
+                </label>
+                <input
+                  type="text"
+                  value={studentCode}
+                  onChange={(e) => setStudentCode(e.target.value)}
+                  placeholder="ឧ. 2222"
+                  className="w-full px-4 py-2.5 border border-slate-200 rounded-xl text-sm font-mono focus:outline-none focus:border-indigo-500"
+                />
+              </div>
+
+              {codesError && (
+                <div className="p-3 bg-rose-50 border border-rose-200 rounded-xl text-xs text-rose-700 font-semibold">
+                  {codesError}
+                </div>
+              )}
+              {codesSavedMsg && (
+                <div className="p-3 bg-emerald-50 border border-emerald-200 rounded-xl text-xs text-emerald-700 font-semibold">
+                  {codesSavedMsg}
+                </div>
+              )}
+
+              <button
+                type="submit"
+                className="px-6 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold rounded-xl shadow-sm cursor-pointer"
+              >
+                រក្សាទុកលេខកូដ
+              </button>
+            </form>
           </div>
         )}
 

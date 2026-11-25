@@ -48,7 +48,7 @@ import { GoogleFormModal } from './components/GoogleFormModal.tsx';
 import { OmrScanner } from './components/OmrScanner.tsx';
 import { StudentOmrSheet } from './components/StudentOmrSheet.tsx';
 import { HomePage } from './components/HomePage.tsx';
-import { SavedTestsPanel } from './components/SavedTestsPanel.tsx';
+import { SchoolHub } from './components/SchoolHub.tsx';
 import { PrincipalPortal } from './components/PrincipalPortal.tsx';
 import { StudentTestPortal } from './components/StudentTestPortal.tsx';
 import { preprocessMathForDisplay } from './utils/mathUtils.ts';
@@ -79,7 +79,7 @@ export default function App() {
   const [googleFormExport, setGoogleFormExport] = useState<{ gsCode: string; htmlCode: string; googleFormCode: string } | null>(null);
   const [test, setTest] = useState<GeneratedTest | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [activeMode, setActiveMode] = useState<'generator' | 'saved' | 'omr' | 'student' | 'principal'>('generator');
+  const [activeMode, setActiveMode] = useState<'hub' | 'generator' | 'student' | 'principal'>('hub');
   const [studentOmrData, setStudentOmrData] = useState<{
     questionCount: number;
     answerType: 'ABCD' | 'KHKK';
@@ -326,7 +326,7 @@ export default function App() {
         onBackToTeacher={() => {
           const base64Data = studentOmrData.rawHash.substring('#share-omr='.length);
           window.location.hash = `#teacher-import=${base64Data}`;
-          setActiveMode('omr');
+          setActiveMode('principal');
           setStudentOmrData(null);
         }}
       />
@@ -338,7 +338,7 @@ export default function App() {
       <HomePage
         onEnterSchool={(school) => {
           setCurrentSchool(school);
-          setActiveMode('generator');
+          setActiveMode('hub');
           setTest(null);
         }}
       />
@@ -348,7 +348,7 @@ export default function App() {
   return (
     <div className="h-screen flex flex-col bg-slate-50 overflow-hidden font-sans text-slate-900 selection:bg-blue-100">
       {/* Header */}
-      <header className="fixed top-0 left-0 right-0 h-20 bg-[#1e293b] text-white flex items-center justify-between px-4 md:px-6 shadow-xl z-[100] print:hidden gap-3 overflow-x-auto">
+      <header className="fixed top-0 left-0 right-0 h-20 bg-[#1e293b] text-white flex items-center justify-between px-4 md:px-6 shadow-xl z-[100] print:hidden gap-3">
         <div className="flex items-center gap-3 shrink-0">
           <button
             onClick={() => { setCurrentSchool(null); setTest(null); }}
@@ -358,117 +358,92 @@ export default function App() {
             <Home className="w-5 h-5" />
           </button>
           <div className="flex flex-col">
-            <h1 className="text-sm md:text-base font-bold tracking-tight leading-none truncate max-w-[180px] md:max-w-[240px]">
+            <h1 className="text-sm md:text-base font-bold tracking-tight leading-none truncate max-w-[180px] md:max-w-[260px]">
               {currentSchool.name}
             </h1>
             <span className="text-[10px] text-blue-300 font-medium mt-1">
-              ប្រព័ន្ធតេស្ដ និងវិញ្ញាសា
+              {activeMode === 'hub' && 'ផ្ទាំងមុខងារសាលា'}
+              {activeMode === 'generator' && 'ផ្នែកគ្រូបង្រៀន • បង្កើតតេស្ដ'}
+              {activeMode === 'student' && 'ផ្នែកសិស្ស • តេស្ដសិស្ស'}
+              {activeMode === 'principal' && 'ផ្នែកនាយកសាលា / លេខា'}
             </span>
           </div>
         </div>
 
-        {/* Mode Selector */}
-        <div className="flex items-center bg-slate-800/60 p-1 rounded-2xl border border-white/5 shrink-0 gap-1">
-          <button
-            onClick={() => setActiveMode('generator')}
-            className={`px-3 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer ${
-              activeMode === 'generator' ? 'bg-blue-600 text-white shadow-md shadow-blue-500/10' : 'text-slate-300 hover:text-white hover:bg-white/5'
-            }`}
-          >
-            <FileText className="w-4 h-4" />
-            <span>បង្កើតវិញ្ញាសា</span>
-          </button>
-          <button
-            onClick={() => setActiveMode('saved')}
-            className={`px-3 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer ${
-              activeMode === 'saved' ? 'bg-blue-600 text-white shadow-md shadow-blue-500/10' : 'text-slate-300 hover:text-white hover:bg-white/5'
-            }`}
-          >
-            <FolderOpen className="w-4 h-4" />
-            <span>ឃ្លាំងវិញ្ញាសា</span>
-          </button>
-          <button
-            onClick={() => setActiveMode('omr')}
-            className={`px-3 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer ${
-              activeMode === 'omr' ? 'bg-blue-600 text-white shadow-md shadow-blue-500/10' : 'text-slate-300 hover:text-white hover:bg-white/5'
-            }`}
-          >
-            <Camera className="w-4 h-4 text-emerald-400" />
-            <span className="hidden lg:inline">ស្កែន OMR</span>
-          </button>
-          <button
-            onClick={() => setActiveMode('student')}
-            className={`px-3 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer ${
-              activeMode === 'student' ? 'bg-emerald-600 text-white shadow-md shadow-emerald-500/10' : 'text-emerald-300 hover:text-white hover:bg-white/5'
-            }`}
-          >
-            <GraduationCap className="w-4 h-4" />
-            <span>តេស្ដ (សិស្ស)</span>
-          </button>
-          <button
-            onClick={() => setActiveMode('principal')}
-            className={`px-3 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer ${
-              activeMode === 'principal' ? 'bg-indigo-600 text-white shadow-md shadow-indigo-500/10' : 'text-indigo-300 hover:text-white hover:bg-white/5'
-            }`}
-          >
-            <UserCheck className="w-4 h-4" />
-            <span>នាយក/លេខា</span>
-          </button>
+        <div className="flex items-center gap-2">
+          {activeMode !== 'hub' && (
+            <button
+              onClick={() => setActiveMode('hub')}
+              className="px-3.5 py-2 bg-slate-800 hover:bg-slate-700 text-slate-200 hover:text-white rounded-xl text-xs font-bold flex items-center gap-1.5 transition-all cursor-pointer"
+            >
+              <FolderOpen className="w-4 h-4 text-blue-400" />
+              <span>មុខងារសាលា</span>
+            </button>
+          )}
+
+          {activeMode === 'generator' && (
+            <div className="flex items-center gap-1.5 bg-slate-800/50 p-1.5 rounded-2xl border border-white/5 shrink-0">
+              <button 
+                onClick={handleExportWord}
+                disabled={!test}
+                className="flex items-center gap-1.5 px-3 py-2 rounded-xl hover:bg-blue-500/10 text-blue-400 hover:text-white transition-all disabled:opacity-20 disabled:cursor-not-allowed cursor-pointer"
+                title="Export Word"
+              >
+                <FileCode className="w-4 h-4" />
+                <span className="text-xs font-bold uppercase hidden xl:block">Word</span>
+              </button>
+
+              <button 
+                onClick={handleExportCSV}
+                disabled={!test}
+                className="flex items-center gap-1.5 px-3 py-2 rounded-xl hover:bg-blue-500/10 text-blue-400 hover:text-white transition-all disabled:opacity-20 disabled:cursor-not-allowed cursor-pointer"
+                title="Export CSV"
+              >
+                <FileSpreadsheet className="w-4 h-4" />
+                <span className="text-xs font-bold uppercase hidden xl:block">CSV</span>
+              </button>
+
+              <button 
+                onClick={handleCreateGoogleForm}
+                disabled={!test}
+                className="flex items-center gap-1.5 px-3 py-2 rounded-xl hover:bg-blue-500/10 text-blue-400 hover:text-white transition-all disabled:opacity-20 disabled:cursor-not-allowed cursor-pointer"
+                title="បង្កើតវិញ្ញាសាជា Web App"
+              >
+                <Globe className="w-4 h-4" />
+                <span className="text-xs font-bold uppercase hidden xl:block">Web App</span>
+              </button>
+
+              <button 
+                onClick={() => { setTest(null); setMaterial(''); setImages([]); }}
+                disabled={!test && !material && images.length === 0}
+                className="flex items-center gap-1.5 px-3 py-2 rounded-xl hover:bg-rose-600 bg-blue-500/20 text-blue-400 hover:text-white transition-all disabled:opacity-20 disabled:cursor-not-allowed cursor-pointer"
+                title="Clear All"
+              >
+                <Trash2 className="w-4 h-4" />
+              </button>
+            </div>
+          )}
         </div>
-
-        {activeMode === 'generator' && (
-          <div className="flex items-center gap-1.5 bg-slate-800/50 p-1.5 rounded-2xl border border-white/5 shrink-0">
-            <button 
-              onClick={handleExportWord}
-              disabled={!test}
-              className="flex items-center gap-1.5 px-3 py-2 rounded-xl hover:bg-blue-500/10 text-blue-400 hover:text-white transition-all disabled:opacity-20 disabled:cursor-not-allowed cursor-pointer"
-              title="Export Word"
-            >
-              <FileCode className="w-4 h-4" />
-              <span className="text-xs font-bold uppercase hidden xl:block">Word</span>
-            </button>
-
-            <button 
-              onClick={handleExportCSV}
-              disabled={!test}
-              className="flex items-center gap-1.5 px-3 py-2 rounded-xl hover:bg-blue-500/10 text-blue-400 hover:text-white transition-all disabled:opacity-20 disabled:cursor-not-allowed cursor-pointer"
-              title="Export CSV"
-            >
-              <FileSpreadsheet className="w-4 h-4" />
-              <span className="text-xs font-bold uppercase hidden xl:block">CSV</span>
-            </button>
-
-            <button 
-              onClick={handleCreateGoogleForm}
-              disabled={!test}
-              className="flex items-center gap-1.5 px-3 py-2 rounded-xl hover:bg-blue-500/10 text-blue-400 hover:text-white transition-all disabled:opacity-20 disabled:cursor-not-allowed cursor-pointer"
-              title="បង្កើតវិញ្ញាសាជា Web App"
-            >
-              <Globe className="w-4 h-4" />
-              <span className="text-xs font-bold uppercase hidden xl:block">Web App</span>
-            </button>
-
-            <button 
-              onClick={() => { setTest(null); setMaterial(''); setImages([]); }}
-              disabled={!test && !material && images.length === 0}
-              className="flex items-center gap-1.5 px-3 py-2 rounded-xl hover:bg-rose-600 bg-blue-500/20 text-blue-400 hover:text-white transition-all disabled:opacity-20 disabled:cursor-not-allowed cursor-pointer"
-              title="Clear All"
-            >
-              <Trash2 className="w-4 h-4" />
-            </button>
-          </div>
-        )}
       </header>
 
       <main className="flex-1 flex overflow-hidden print:block print:overflow-visible mt-20">
-        {activeMode === 'omr' ? (
-          <OmrScanner currentTest={test} onBack={() => setActiveMode('generator')} />
-        ) : activeMode === 'saved' ? (
-          <SavedTestsPanel school={currentSchool} onLoadTest={handleLoadSavedTest} />
+        {activeMode === 'hub' ? (
+          <SchoolHub
+            school={currentSchool}
+            onEnterTeacher={() => setActiveMode('generator')}
+            onEnterStudent={() => setActiveMode('student')}
+            onEnterPrincipal={() => setActiveMode('principal')}
+          />
         ) : activeMode === 'student' ? (
           <StudentTestPortal school={currentSchool} />
         ) : activeMode === 'principal' ? (
-          <PrincipalPortal school={currentSchool} onSubjectsChanged={() => loadSchoolSubjects(currentSchool.id)} />
+          <PrincipalPortal
+            school={currentSchool}
+            currentTest={test}
+            onSubjectsChanged={() => loadSchoolSubjects(currentSchool.id)}
+            onSchoolUpdated={(updated) => setCurrentSchool(updated)}
+            onLoadTestToGenerator={handleLoadSavedTest}
+          />
         ) : (
           <>
             {/* Sidebar Settings */}
@@ -766,10 +741,10 @@ export default function App() {
                               <span>{isSavingTest ? 'កំពុងរក្សាទុក...' : 'រក្សាទុកក្នុងកម្មវិធី'}</span>
                             </button>
                             <button
-                              onClick={() => setActiveMode('omr')}
+                              onClick={() => setActiveMode('principal')}
                               className="flex-1 md:flex-initial flex items-center justify-center gap-2 px-4 py-2.5 bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs rounded-xl shadow-md shadow-blue-500/20 transition-all active:scale-95 cursor-pointer"
                             >
-                              <span>ស្កែន OMR</span>
+                              <span>នាយក / ស្កែន OMR</span>
                               <ArrowRight className="w-4 h-4" />
                             </button>
                           </div>

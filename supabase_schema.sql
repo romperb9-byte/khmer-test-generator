@@ -9,6 +9,8 @@ CREATE TABLE IF NOT EXISTS schools (
   name TEXT NOT NULL,
   access_code TEXT NOT NULL,
   principal_code TEXT NOT NULL DEFAULT '1234',
+  teacher_code TEXT NOT NULL DEFAULT '1111',
+  student_code TEXT NOT NULL DEFAULT '2222',
   description TEXT DEFAULT '',
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );

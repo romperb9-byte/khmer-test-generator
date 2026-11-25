@@ -54,6 +54,8 @@ export interface School {
   name: string;
   access_code: string;
   principal_code: string;
+  teacher_code?: string;
+  student_code?: string;
   description?: string;
   created_at?: string;
 }

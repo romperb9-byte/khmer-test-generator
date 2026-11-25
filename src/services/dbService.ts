@@ -62,6 +62,8 @@ export async function createSchool(input: Omit<School, 'id' | 'created_at'>): Pr
         name: input.name.trim(),
         access_code: input.access_code.trim(),
         principal_code: input.principal_code.trim() || '1234',
+        teacher_code: input.teacher_code?.trim() || '1111',
+        student_code: input.student_code?.trim() || '2222',
         description: input.description?.trim() || '',
       }])
       .select()
@@ -84,6 +86,8 @@ export async function createSchool(input: Omit<School, 'id' | 'created_at'>): Pr
     name: input.name.trim(),
     access_code: input.access_code.trim(),
     principal_code: input.principal_code.trim() || '1234',
+    teacher_code: input.teacher_code?.trim() || '1111',
+    student_code: input.student_code?.trim() || '2222',
     description: input.description?.trim() || '',
     created_at: new Date().toISOString(),
   };

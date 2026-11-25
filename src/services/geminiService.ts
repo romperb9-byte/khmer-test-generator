@@ -28,7 +28,7 @@ export function setStoredGeminiApiKey(key: string): void {
   }
 }
 
-function resolveGeminiClient(explicitKey?: string): GoogleGenAI {
+function resolveApiKey(explicitKey?: string): string {
   const apiKey =
     explicitKey?.trim() ||
     getStoredGeminiApiKey() ||
@@ -39,7 +39,85 @@ function resolveGeminiClient(explicitKey?: string): GoogleGenAI {
   if (!apiKey || apiKey === 'MY_GEMINI_API_KEY') {
     throw new Error('សូមបញ្ចូល Gemini API Key (Free) ជាមុនសិន មុននឹងប្រើប្រាស់មុខងារ AI!');
   }
-  return new GoogleGenAI({ apiKey });
+  return apiKey;
+}
+
+async function discoverAvailableFlashModel(apiKey: string): Promise<string | null> {
+  try {
+    const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models?key=${encodeURIComponent(apiKey)}`);
+    if (!res.ok) return null;
+    const data = await res.json();
+    const models: any[] = data?.models || [];
+    const flashModels = models
+      .filter((m: any) =>
+        Array.isArray(m.supportedGenerationMethods) &&
+        m.supportedGenerationMethods.includes('generateContent') &&
+        typeof m.name === 'string' &&
+        m.name.toLowerCase().includes('flash') &&
+        !m.name.toLowerCase().includes('lite') &&
+        !m.name.toLowerCase().includes('audio') &&
+        !m.name.toLowerCase().includes('image')
+      )
+      .map((m: any) => m.name.replace(/^models\//, ''));
+
+    // Prefer newest flash or flash-latest
+    const preferred =
+      flashModels.find(n => n.includes('3.8-flash')) ||
+      flashModels.find(n => n.includes('3-flash')) ||
+      flashModels.find(n => n.includes('flash-latest')) ||
+      flashModels[0];
+
+    return preferred || null;
+  } catch {
+    return null;
+  }
+}
+
+async function generateWithAutoFlashModel(
+  apiKey: string,
+  parts: any[],
+  schema: any,
+  temperature: number
+) {
+  const ai = new GoogleGenAI({ apiKey });
+  const primaryModel = "gemini-3.8-flash";
+
+  try {
+    return await callWithTimeout(
+      ai.models.generateContent({
+        model: primaryModel,
+        contents: { parts },
+        config: {
+          responseMimeType: "application/json",
+          responseSchema: schema,
+          temperature,
+        },
+      }),
+      60000
+    );
+  } catch (primaryErr: any) {
+    const msg = String(primaryErr?.message || primaryErr || '');
+    const isNotFound = msg.includes('404') || msg.includes('NOT_FOUND') || msg.includes('no longer available');
+
+    if (isNotFound) {
+      const discovered = await discoverAvailableFlashModel(apiKey);
+      if (discovered && discovered !== primaryModel) {
+        return await callWithTimeout(
+          ai.models.generateContent({
+            model: discovered,
+            contents: { parts },
+            config: {
+              responseMimeType: "application/json",
+              responseSchema: schema,
+              temperature,
+            },
+          }),
+          60000
+        );
+      }
+    }
+    throw primaryErr;
+  }
 }
 
 const RESPONSE_SCHEMA = {
@@ -140,7 +218,7 @@ async function callWithTimeout<T>(promise: Promise<T>, ms = 60000): Promise<T> {
 
 export async function generateTest(options: TestGeneratorOptions): Promise<GeneratedTest> {
   const { grade, subject, material, images, questionCounts, difficultyDistribution, apiKey } = options;
-  const ai = resolveGeminiClient(apiKey);
+  const resolvedKey = resolveApiKey(apiKey);
 
   const prompt = `
     You are a professional Khmer teacher assistant. Generate a monthly/semester test in Khmer based on the provided material.
@@ -202,35 +280,12 @@ export async function generateTest(options: TestGeneratorOptions): Promise<Gener
     });
   }
 
-  let response: any;
-  try {
-    response = await callWithTimeout(
-      ai.models.generateContent({
-        model: "gemini-3.8-flash",
-        contents: { parts: contents },
-        config: {
-          responseMimeType: "application/json",
-          responseSchema: RESPONSE_SCHEMA as any,
-          temperature: 0.7,
-        },
-      }),
-      60000
-    );
-  } catch (primaryErr) {
-    // Fallback to gemini-2.5-flash
-    response = await callWithTimeout(
-      ai.models.generateContent({
-        model: "gemini-2.5-flash",
-        contents: { parts: contents },
-        config: {
-          responseMimeType: "application/json",
-          responseSchema: RESPONSE_SCHEMA as any,
-          temperature: 0.7,
-        },
-      }),
-      60000
-    );
-  }
+  const response = await generateWithAutoFlashModel(
+    resolvedKey,
+    contents,
+    RESPONSE_SCHEMA as any,
+    0.7
+  );
 
   if (!response.text) {
     throw new Error("Failed to generate test content. Please try again.");
@@ -302,7 +357,7 @@ export async function gradeOmrSheet(
   answerKey: OmrAnswerKeyItem[],
   apiKey?: string
 ): Promise<OmrGradingResult> {
-  const ai = resolveGeminiClient(apiKey);
+  const resolvedKey = resolveApiKey(apiKey);
   const parts = imageBase64.split(",");
   const mimeType = parts[0].match(/:(.*?);/)?.[1] || "image/png";
   const data = parts[1] || parts[0];
@@ -342,17 +397,11 @@ export async function gradeOmrSheet(
     text: prompt
   };
 
-  const response = await callWithTimeout(
-    ai.models.generateContent({
-      model: "gemini-3.8-flash",
-      contents: { parts: [imagePart, textPart] },
-      config: {
-        responseMimeType: "application/json",
-        responseSchema: OMR_RESPONSE_SCHEMA as any,
-        temperature: 0.2,
-      }
-    }),
-    60000
+  const response = await generateWithAutoFlashModel(
+    resolvedKey,
+    [imagePart, textPart],
+    OMR_RESPONSE_SCHEMA as any,
+    0.2
   );
 
   if (!response.text) {

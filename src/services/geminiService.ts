@@ -42,34 +42,35 @@ function resolveApiKey(explicitKey?: string): string {
   return apiKey;
 }
 
-async function discoverAvailableFlashModel(apiKey: string): Promise<string | null> {
+async function discoverCandidateModels(apiKey: string): Promise<string[]> {
   try {
     const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models?key=${encodeURIComponent(apiKey)}`);
-    if (!res.ok) return null;
+    if (!res.ok) return [];
     const data = await res.json();
     const models: any[] = data?.models || [];
-    const flashModels = models
+    const candidates = models
       .filter((m: any) =>
         Array.isArray(m.supportedGenerationMethods) &&
         m.supportedGenerationMethods.includes('generateContent') &&
         typeof m.name === 'string' &&
         m.name.toLowerCase().includes('flash') &&
-        !m.name.toLowerCase().includes('lite') &&
         !m.name.toLowerCase().includes('audio') &&
-        !m.name.toLowerCase().includes('image')
+        !m.name.toLowerCase().includes('image') &&
+        !m.name.toLowerCase().includes('tts')
       )
       .map((m: any) => m.name.replace(/^models\//, ''));
 
-    // Prefer newest flash or flash-latest
-    const preferred =
-      flashModels.find(n => n.includes('3.8-flash')) ||
-      flashModels.find(n => n.includes('3-flash')) ||
-      flashModels.find(n => n.includes('flash-latest')) ||
-      flashModels[0];
+    const priorityScore = (n: string) => {
+      if (n.includes('3.8-flash') && !n.includes('lite')) return 1;
+      if (n.includes('3-flash') && !n.includes('lite')) return 2;
+      if (n === 'gemini-flash-latest') return 3;
+      if (!n.includes('lite')) return 4;
+      return 5;
+    };
 
-    return preferred || null;
+    return Array.from(new Set(candidates)).sort((a, b) => priorityScore(a) - priorityScore(b));
   } catch {
-    return null;
+    return [];
   }
 }
 
@@ -82,10 +83,10 @@ async function generateWithAutoFlashModel(
   const ai = new GoogleGenAI({ apiKey });
   const primaryModel = "gemini-3.8-flash";
 
-  try {
+  const tryModel = async (model: string) => {
     return await callWithTimeout(
       ai.models.generateContent({
-        model: primaryModel,
+        model,
         contents: { parts },
         config: {
           responseMimeType: "application/json",
@@ -93,27 +94,39 @@ async function generateWithAutoFlashModel(
           temperature,
         },
       }),
-      60000
+      45000
     );
+  };
+
+  try {
+    return await tryModel(primaryModel);
   } catch (primaryErr: any) {
     const msg = String(primaryErr?.message || primaryErr || '');
-    const isNotFound = msg.includes('404') || msg.includes('NOT_FOUND') || msg.includes('no longer available');
+    const isRetryable =
+      msg.includes('404') ||
+      msg.includes('NOT_FOUND') ||
+      msg.includes('no longer available') ||
+      msg.includes('503') ||
+      msg.includes('UNAVAILABLE') ||
+      msg.includes('high demand') ||
+      msg.includes('429');
 
-    if (isNotFound) {
-      const discovered = await discoverAvailableFlashModel(apiKey);
-      if (discovered && discovered !== primaryModel) {
-        return await callWithTimeout(
-          ai.models.generateContent({
-            model: discovered,
-            contents: { parts },
-            config: {
-              responseMimeType: "application/json",
-              responseSchema: schema,
-              temperature,
-            },
-          }),
-          60000
-        );
+    if (isRetryable) {
+      const discovered = await discoverCandidateModels(apiKey);
+      const fallbacks = discovered.filter(m => m !== primaryModel).slice(0, 4);
+
+      for (const model of fallbacks) {
+        try {
+          return await tryModel(model);
+        } catch {
+          // try next available model
+        }
+      }
+
+      // Final retry on primary after short pause if 503
+      if (msg.includes('503') || msg.includes('UNAVAILABLE')) {
+        await new Promise(r => setTimeout(r, 2000));
+        return await tryModel(primaryModel);
       }
     }
     throw primaryErr;

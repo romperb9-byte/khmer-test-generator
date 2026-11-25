@@ -206,22 +206,21 @@ export async function generateTest(options: TestGeneratorOptions): Promise<Gener
   try {
     response = await callWithTimeout(
       ai.models.generateContent({
-        model: "gemini-2.5-flash",
+        model: "gemini-3.8-flash",
         contents: { parts: contents },
         config: {
           responseMimeType: "application/json",
           responseSchema: RESPONSE_SCHEMA as any,
           temperature: 0.7,
-          thinkingConfig: { thinkingBudget: 0 },
         },
       }),
       60000
     );
   } catch (primaryErr) {
-    // Fallback to gemini-2.0-flash if 2.5-flash fails
+    // Fallback to gemini-2.5-flash
     response = await callWithTimeout(
       ai.models.generateContent({
-        model: "gemini-2.0-flash",
+        model: "gemini-2.5-flash",
         contents: { parts: contents },
         config: {
           responseMimeType: "application/json",
@@ -345,13 +344,12 @@ export async function gradeOmrSheet(
 
   const response = await callWithTimeout(
     ai.models.generateContent({
-      model: "gemini-2.5-flash",
+      model: "gemini-3.8-flash",
       contents: { parts: [imagePart, textPart] },
       config: {
         responseMimeType: "application/json",
         responseSchema: OMR_RESPONSE_SCHEMA as any,
         temperature: 0.2,
-        thinkingConfig: { thinkingBudget: 0 },
       }
     }),
     60000

@@ -99,6 +99,7 @@ export const StudentTestPortal: React.FC<StudentTestPortalProps> = ({ school }) 
   const [grade, setGrade] = useState(GRADES[11]);
   const [studentId, setStudentId] = useState('');
   const [studentName, setStudentName] = useState('');
+  const [selectedSchoolName, setSelectedSchoolName] = useState(school.name);
   const [subject, setSubject] = useState('');
 
   const [subjects, setSubjects] = useState<string[]>([]);
@@ -519,6 +520,38 @@ export const StudentTestPortal: React.FC<StudentTestPortalProps> = ({ school }) 
           )}
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            {/* Student Roster Dropdown */}
+            <div className="sm:col-span-2">
+              <label className="block text-xs font-bold text-slate-700 mb-1.5">
+                ជ្រើសរើសសិស្សពីបញ្ជី (អត្តលេខ • ឈ្មោះសិស្ស • ថ្នាក់ • សាលា)
+              </label>
+              <select
+                value={roster.find(r => r.student_id === studentId)?.student_id || ''}
+                onChange={(e) => {
+                  const chosenId = e.target.value;
+                  const found = roster.find(r => r.student_id === chosenId);
+                  if (found) {
+                    setStudentId(found.student_id);
+                    setStudentName(found.student_name);
+                    if (found.grade) setGrade(found.grade);
+                    setSelectedSchoolName(found.school_name || school.name);
+                  }
+                }}
+                className="w-full px-4 py-2.5 bg-emerald-50/60 border border-emerald-200 rounded-xl text-sm font-semibold text-slate-800 focus:outline-none focus:border-emerald-500"
+              >
+                <option value="">
+                  {roster.length > 0
+                    ? `-- ជ្រើសរើសឈ្មោះសិស្សពីបញ្ជី (${roster.length} នាក់) --`
+                    : '-- មិនទាន់មានបញ្ជីឈ្មោះសិស្ស (អាចវាយបញ្ចូលខាងក្រោម) --'}
+                </option>
+                {roster.map(st => (
+                  <option key={st.id} value={st.student_id}>
+                    {st.student_id} — {st.student_name} — {st.grade} — {st.school_name || school.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+
             <div>
               <label className="block text-xs font-bold text-slate-700 mb-1.5">ជ្រើសរើសថ្នាក់</label>
               <select
@@ -526,7 +559,9 @@ export const StudentTestPortal: React.FC<StudentTestPortalProps> = ({ school }) 
                 onChange={(e) => setGrade(e.target.value)}
                 className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm font-semibold focus:outline-none focus:border-blue-500"
               >
-                {GRADES.map(g => <option key={g} value={g}>{g}</option>)}
+                {Array.from(new Set([...GRADES, ...roster.map(r => r.grade).filter(Boolean)])).map(g => (
+                  <option key={g} value={g}>{g}</option>
+                ))}
               </select>
             </div>
 
@@ -555,9 +590,8 @@ export const StudentTestPortal: React.FC<StudentTestPortalProps> = ({ school }) 
                   const found = roster.find(r => r.student_id.trim().toLowerCase() === val.trim().toLowerCase());
                   if (found) {
                     setStudentName(found.student_name);
-                    if (found.grade && GRADES.includes(found.grade)) {
-                      setGrade(found.grade);
-                    }
+                    if (found.grade) setGrade(found.grade);
+                    setSelectedSchoolName(found.school_name || school.name);
                   }
                 }}
                 placeholder="ឧ. 00125"
@@ -575,6 +609,16 @@ export const StudentTestPortal: React.FC<StudentTestPortalProps> = ({ school }) 
                 onChange={(e) => setStudentName(e.target.value)}
                 placeholder="ឧ. សុខ វិបុល"
                 className="w-full px-4 py-2.5 bg-white border border-slate-200 rounded-xl text-sm focus:outline-none focus:border-blue-500"
+              />
+            </div>
+
+            <div className="sm:col-span-2">
+              <label className="block text-xs font-bold text-slate-700 mb-1.5">សាលា</label>
+              <input
+                type="text"
+                value={selectedSchoolName}
+                onChange={(e) => setSelectedSchoolName(e.target.value)}
+                className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm font-semibold text-slate-700 focus:outline-none focus:border-blue-500"
               />
             </div>
           </div>

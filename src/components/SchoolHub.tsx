@@ -7,7 +7,9 @@ import {
   Lock,
   ArrowRight,
   X,
-  School as SchoolIcon
+  School as SchoolIcon,
+  Eye,
+  EyeOff
 } from 'lucide-react';
 import { School } from '../types';
 
@@ -26,6 +28,7 @@ export const SchoolHub: React.FC<SchoolHubProps> = ({
 }) => {
   const [promptTarget, setPromptTarget] = useState<'teacher' | 'student' | null>(null);
   const [enteredCode, setEnteredCode] = useState('');
+  const [showCode, setShowCode] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const openPrompt = (target: 'teacher' | 'student') => {
@@ -196,14 +199,23 @@ export const SchoolHub: React.FC<SchoolHubProps> = ({
 
               <form onSubmit={handleVerify} className="space-y-4">
                 <div>
-                  <input
-                    type="password"
-                    autoFocus
-                    value={enteredCode}
-                    onChange={(e) => { setEnteredCode(e.target.value); setError(null); }}
-                    placeholder="បញ្ចូលលេខកូដ..."
-                    className="w-full px-4 py-3 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
-                  />
+                  <div className="relative">
+                    <input
+                      type={showCode ? 'text' : 'password'}
+                      autoFocus
+                      value={enteredCode}
+                      onChange={(e) => { setEnteredCode(e.target.value); setError(null); }}
+                      placeholder="បញ្ចូលលេខកូដ..."
+                      className="w-full pl-4 pr-10 py-3 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowCode(!showCode)}
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 cursor-pointer"
+                    >
+                      {showCode ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                    </button>
+                  </div>
                   {error && <p className="text-xs text-rose-600 font-semibold mt-2">{error}</p>}
                 </div>
 

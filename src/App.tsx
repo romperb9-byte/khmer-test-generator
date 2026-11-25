@@ -36,7 +36,9 @@ import {
   UserCheck,
   Save,
   KeyRound,
-  CheckCircle2
+  CheckCircle2,
+  Eye,
+  EyeOff
 } from 'lucide-react';
 import { Difficulty, QuestionType, TestGeneratorOptions, GeneratedTest, Question, School, SavedTest } from './types.ts';
 import { generateTest, getStoredGeminiApiKey, setStoredGeminiApiKey } from './services/geminiService.ts';
@@ -64,6 +66,7 @@ export default function App() {
   const [grade, setGrade] = useState(GRADES[11]);
   const [subject, setSubject] = useState(DEFAULT_SUBJECTS[1]);
   const [apiKey, setApiKey] = useState(() => getStoredGeminiApiKey());
+  const [showSidebarApiKey, setShowSidebarApiKey] = useState(false);
   const [teacherName, setTeacherName] = useState('គ្រូបង្រៀន');
   const [isSavingTest, setIsSavingTest] = useState(false);
   const [saveSuccessMsg, setSaveSuccessMsg] = useState<string | null>(null);
@@ -467,16 +470,25 @@ export default function App() {
                     យក Key ↗
                   </a>
                 </div>
-                <input
-                  type="password"
-                  value={apiKey}
-                  onChange={(e) => {
-                    setApiKey(e.target.value);
-                    setStoredGeminiApiKey(e.target.value);
-                  }}
-                  placeholder="បញ្ចូល AIza... (Free)"
-                  className="w-full px-2.5 py-1.5 text-xs bg-white border border-slate-200 rounded-lg focus:outline-none focus:border-blue-500"
-                />
+                <div className="relative">
+                  <input
+                    type={showSidebarApiKey ? 'text' : 'password'}
+                    value={apiKey}
+                    onChange={(e) => {
+                      setApiKey(e.target.value);
+                      setStoredGeminiApiKey(e.target.value);
+                    }}
+                    placeholder="បញ្ចូល AIza... (Free)"
+                    className="w-full pl-2.5 pr-8 py-1.5 text-xs bg-white border border-slate-200 rounded-lg focus:outline-none focus:border-blue-500"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowSidebarApiKey(!showSidebarApiKey)}
+                    className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 cursor-pointer"
+                  >
+                    {showSidebarApiKey ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
+                  </button>
+                </div>
               </div>
 
               <div>

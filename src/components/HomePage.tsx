@@ -46,6 +46,7 @@ export const HomePage: React.FC<HomePageProps> = ({ onEnterSchool }) => {
   // School Access Code Modal
   const [selectedSchool, setSelectedSchool] = useState<School | null>(null);
   const [enteredCode, setEnteredCode] = useState('');
+  const [showSchoolCode, setShowSchoolCode] = useState(false);
   const [codeError, setCodeError] = useState<string | null>(null);
 
   // Admin Modal & Auth
@@ -53,6 +54,7 @@ export const HomePage: React.FC<HomePageProps> = ({ onEnterSchool }) => {
   const [isAdminLoggedIn, setIsAdminLoggedIn] = useState(false);
   const [adminUsername, setAdminUsername] = useState('');
   const [adminPassword, setAdminPassword] = useState('');
+  const [showAdminPassword, setShowAdminPassword] = useState(false);
   const [adminAuthError, setAdminAuthError] = useState<string | null>(null);
 
   // Admin School Form
@@ -408,14 +410,23 @@ export const HomePage: React.FC<HomePageProps> = ({ onEnterSchool }) => {
               <form onSubmit={handleVerifySchoolCode} className="space-y-4">
                 <div>
                   <label className="block text-xs font-bold text-slate-700 mb-1.5">លេខកូដសាលា (Access Code)</label>
-                  <input
-                    type="password"
-                    autoFocus
-                    value={enteredCode}
-                    onChange={(e) => { setEnteredCode(e.target.value); setCodeError(null); }}
-                    placeholder="បញ្ចូលលេខកូដដែល Admin បានកំណត់..."
-                    className="w-full px-4 py-3 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
-                  />
+                  <div className="relative">
+                    <input
+                      type={showSchoolCode ? 'text' : 'password'}
+                      autoFocus
+                      value={enteredCode}
+                      onChange={(e) => { setEnteredCode(e.target.value); setCodeError(null); }}
+                      placeholder="បញ្ចូលលេខកូដដែល Admin បានកំណត់..."
+                      className="w-full pl-4 pr-10 py-3 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowSchoolCode(!showSchoolCode)}
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 cursor-pointer"
+                    >
+                      {showSchoolCode ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                    </button>
+                  </div>
                   {codeError && (
                     <p className="text-xs text-rose-600 font-semibold mt-2">{codeError}</p>
                   )}
@@ -500,13 +511,22 @@ export const HomePage: React.FC<HomePageProps> = ({ onEnterSchool }) => {
                     </div>
                     <div>
                       <label className="block text-xs font-bold text-slate-700 mb-1.5">លេខសម្ងាត់ (Password)</label>
-                      <input
-                        type="password"
-                        value={adminPassword}
-                        onChange={(e) => setAdminPassword(e.target.value)}
-                        placeholder="••••••••"
-                        className="w-full px-4 py-2.5 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
-                      />
+                      <div className="relative">
+                        <input
+                          type={showAdminPassword ? 'text' : 'password'}
+                          value={adminPassword}
+                          onChange={(e) => setAdminPassword(e.target.value)}
+                          placeholder="••••••••"
+                          className="w-full pl-4 pr-10 py-2.5 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => setShowAdminPassword(!showAdminPassword)}
+                          className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 cursor-pointer"
+                        >
+                          {showAdminPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                        </button>
+                      </div>
                     </div>
                     {adminAuthError && (
                       <p className="text-xs text-rose-600 font-semibold">{adminAuthError}</p>

@@ -49,6 +49,7 @@ export const PrincipalPortal: React.FC<PrincipalPortalProps> = ({
 }) => {
   const [unlocked, setUnlocked] = useState(false);
   const [passcode, setPasscode] = useState('');
+  const [showPasscode, setShowPasscode] = useState(false);
   const [authError, setAuthError] = useState<string | null>(null);
 
   const [activeTab, setActiveTab] = useState<'tests' | 'omr' | 'scores' | 'subjects' | 'codes'>('tests');
@@ -231,13 +232,20 @@ export const PrincipalPortal: React.FC<PrincipalPortalProps> = ({
               <div className="relative">
                 <Lock className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
                 <input
-                  type="password"
+                  type={showPasscode ? 'text' : 'password'}
                   autoFocus
                   value={passcode}
                   onChange={(e) => { setPasscode(e.target.value); setAuthError(null); }}
                   placeholder="បញ្ចូលលេខកូដ..."
-                  className="w-full pl-10 pr-4 py-3 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500"
+                  className="w-full pl-10 pr-10 py-3 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500"
                 />
+                <button
+                  type="button"
+                  onClick={() => setShowPasscode(!showPasscode)}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 cursor-pointer"
+                >
+                  {showPasscode ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                </button>
               </div>
               {authError && <p className="text-xs text-rose-600 font-semibold mt-2">{authError}</p>}
             </div>

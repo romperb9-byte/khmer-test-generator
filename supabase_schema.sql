@@ -72,3 +72,20 @@ CREATE POLICY "Allow public read/write schools" ON schools FOR ALL USING (true) 
 CREATE POLICY "Allow public read/write subjects" ON subjects FOR ALL USING (true) WITH CHECK (true);
 CREATE POLICY "Allow public read/write tests" ON tests FOR ALL USING (true) WITH CHECK (true);
 CREATE POLICY "Allow public read/write submissions" ON submissions FOR ALL USING (true) WITH CHECK (true);
+
+-- 5. Students Roster Table (បញ្ជីឈ្មោះសិស្ស)
+CREATE TABLE IF NOT EXISTS students (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  school_id UUID NOT NULL REFERENCES schools(id) ON DELETE CASCADE,
+  student_id TEXT NOT NULL,
+  student_name TEXT NOT NULL,
+  gender TEXT DEFAULT '',
+  grade TEXT NOT NULL,
+  school_name TEXT DEFAULT '',
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  UNIQUE(school_id, student_id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_students_school_grade ON students(school_id, grade);
+ALTER TABLE students ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "Allow public read/write students" ON students FOR ALL USING (true) WITH CHECK (true);

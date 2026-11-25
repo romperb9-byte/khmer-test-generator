@@ -14,8 +14,8 @@ import {
   Award,
   AlertCircle
 } from 'lucide-react';
-import { School, SavedTest, Question, QuestionType, StudentSubmission } from '../types';
-import { fetchTests, fetchSubjects, submitStudentTest } from '../services/dbService';
+import { School, SavedTest, Question, QuestionType, StudentSubmission, StudentRecord } from '../types';
+import { fetchTests, fetchSubjects, submitStudentTest, fetchStudents } from '../services/dbService';
 import { preprocessMathForDisplay } from '../utils/mathUtils';
 
 const GRADES = Array.from({ length: 12 }, (_, i) => `ថ្នាក់ទី ${i + 1}`);
@@ -103,6 +103,7 @@ export const StudentTestPortal: React.FC<StudentTestPortalProps> = ({ school }) 
 
   const [subjects, setSubjects] = useState<string[]>([]);
   const [publishedTests, setPublishedTests] = useState<SavedTest[]>([]);
+  const [roster, setRoster] = useState<StudentRecord[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -117,9 +118,10 @@ export const StudentTestPortal: React.FC<StudentTestPortalProps> = ({ school }) 
     const load = async () => {
       setLoading(true);
       try {
-        const [subjs, tests] = await Promise.all([
+        const [subjs, tests, studentList] = await Promise.all([
           fetchSubjects(school.id),
-          fetchTests(school.id)
+          fetchTests(school.id),
+          fetchStudents(school.id).catch(() => [] as StudentRecord[])
         ]);
         const subjNames = subjs.map(s => s.name);
         setSubjects(subjNames);
@@ -127,6 +129,7 @@ export const StudentTestPortal: React.FC<StudentTestPortalProps> = ({ school }) 
           setSubject(subjNames[0]);
         }
         setPublishedTests(tests.filter(t => t.is_published));
+        setRoster(studentList);
       } finally {
         setLoading(false);
       }
@@ -546,7 +549,17 @@ export const StudentTestPortal: React.FC<StudentTestPortalProps> = ({ school }) 
               <input
                 type="text"
                 value={studentId}
-                onChange={(e) => setStudentId(e.target.value)}
+                onChange={(e) => {
+                  const val = e.target.value;
+                  setStudentId(val);
+                  const found = roster.find(r => r.student_id.trim().toLowerCase() === val.trim().toLowerCase());
+                  if (found) {
+                    setStudentName(found.student_name);
+                    if (found.grade && GRADES.includes(found.grade)) {
+                      setGrade(found.grade);
+                    }
+                  }
+                }}
                 placeholder="ឧ. 00125"
                 className="w-full px-4 py-2.5 bg-white border border-slate-200 rounded-xl text-sm focus:outline-none focus:border-blue-500"
               />

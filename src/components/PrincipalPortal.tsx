@@ -16,10 +16,14 @@ import {
   AlertCircle,
   Camera,
   KeyRound,
-  FolderOpen
+  FolderOpen,
+  Users,
+  Upload,
+  FileSpreadsheet
 } from 'lucide-react';
 import { saveAs } from 'file-saver';
-import { School, SavedTest, StudentSubmission, SubjectItem, GeneratedTest } from '../types';
+import * as XLSX from 'xlsx';
+import { School, SavedTest, StudentSubmission, SubjectItem, GeneratedTest, StudentRecord } from '../types';
 import {
   fetchTests,
   updateTestSettings,
@@ -28,7 +32,10 @@ import {
   fetchSubjects,
   addSubject,
   deleteSubject,
-  updateSchool
+  updateSchool,
+  fetchStudents,
+  upsertStudents,
+  deleteStudent
 } from '../services/dbService';
 import { OmrScanner } from './OmrScanner';
 
@@ -52,11 +59,20 @@ export const PrincipalPortal: React.FC<PrincipalPortalProps> = ({
   const [showPasscode, setShowPasscode] = useState(false);
   const [authError, setAuthError] = useState<string | null>(null);
 
-  const [activeTab, setActiveTab] = useState<'tests' | 'omr' | 'scores' | 'subjects' | 'codes'>('tests');
+  const [activeTab, setActiveTab] = useState<'tests' | 'omr' | 'scores' | 'students' | 'subjects' | 'codes'>('tests');
   const [tests, setTests] = useState<SavedTest[]>([]);
   const [submissions, setSubmissions] = useState<StudentSubmission[]>([]);
   const [subjects, setSubjects] = useState<SubjectItem[]>([]);
+  const [students, setStudents] = useState<StudentRecord[]>([]);
   const [loading, setLoading] = useState(false);
+
+  // Student roster filter & upload state
+  const [studentGradeFilter, setStudentGradeFilter] = useState('ទាំងអស់');
+  const [studentSearch, setStudentSearch] = useState('');
+  const [uploadingExcel, setUploadingExcel] = useState(false);
+  const [excelMessage, setExcelMessage] = useState<string | null>(null);
+  const [excelError, setExcelError] = useState<string | null>(null);
+  const excelInputRef = React.useRef<HTMLInputElement>(null);
 
   // Access Codes state
   const [teacherCode, setTeacherCode] = useState(school.teacher_code || '1111');
@@ -78,14 +94,16 @@ export const PrincipalPortal: React.FC<PrincipalPortalProps> = ({
   const loadAllData = async () => {
     setLoading(true);
     try {
-      const [tData, sData, subData] = await Promise.all([
+      const [tData, sData, subData, stData] = await Promise.all([
         fetchTests(school.id),
         fetchSubmissions(school.id),
-        fetchSubjects(school.id)
+        fetchSubjects(school.id),
+        fetchStudents(school.id).catch(() => [] as StudentRecord[])
       ]);
       setTests(tData);
       setSubmissions(sData);
       setSubjects(subData);
+      setStudents(stData);
     } finally {
       setLoading(false);
     }
@@ -163,6 +181,82 @@ export const PrincipalPortal: React.FC<PrincipalPortalProps> = ({
     } catch (err) {
       setCodesError(err instanceof Error ? err.message : 'មិនអាចរក្សាទុកលេខកូដបានទេ (សូមពិនិត្យថាបានបន្ថែម column teacher_code/student_code ក្នុង Supabase)');
     }
+  };
+
+  const handleDownloadStudentTemplate = () => {
+    const sampleRows = [
+      {
+        'អត្តលេខ': '001',
+        'ឈ្មោះ': 'សុខ វិបុល',
+        'ភេទ': 'ប្រុស',
+        'ថ្នាក់': 'ថ្នាក់ទី ១២',
+        'សាលា': school.name,
+      },
+      {
+        'អត្តលេខ': '002',
+        'ឈ្មោះ': 'ចន្ទ្រា សុភា',
+        'ភេទ': 'ស្រី',
+        'ថ្នាក់': 'ថ្នាក់ទី ១២',
+        'សាលា': school.name,
+      },
+    ];
+    const ws = XLSX.utils.json_to_sheet(sampleRows);
+    ws['!cols'] = [{ wch: 15 }, { wch: 25 }, { wch: 10 }, { wch: 16 }, { wch: 30 }];
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'បញ្ជីឈ្មោះសិស្ស');
+    XLSX.writeFile(wb, `គំរូបញ្ជីឈ្មោះសិស្ស_${school.name}.xlsx`);
+  };
+
+  const handleUploadStudentExcel = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setUploadingExcel(true);
+    setExcelError(null);
+    setExcelMessage(null);
+
+    try {
+      const buffer = await file.arrayBuffer();
+      const wb = XLSX.read(buffer, { type: 'array' });
+      const firstSheet = wb.Sheets[wb.SheetNames[0]];
+      const rawRows = XLSX.utils.sheet_to_json<Record<string, any>>(firstSheet, { defval: '' });
+
+      const parsed = rawRows
+        .map(row => {
+          const sid = String(row['អត្តលេខ'] || row['អត្ថលេខ'] || row['student_id'] || row['ID'] || '').trim();
+          const sname = String(row['ឈ្មោះ'] || row['ឈ្មោះសិស្ស'] || row['student_name'] || row['Name'] || '').trim();
+          const gender = String(row['ភេទ'] || row['gender'] || row['Gender'] || '').trim();
+          const gradeVal = String(row['ថ្នាក់'] || row['grade'] || row['Grade'] || '').trim();
+          const schoolVal = String(row['សាលា'] || row['school_name'] || row['School'] || school.name).trim();
+          return {
+            student_id: sid,
+            student_name: sname,
+            gender,
+            grade: gradeVal,
+            school_name: schoolVal || school.name,
+          };
+        })
+        .filter(r => r.student_id && r.student_name);
+
+      if (parsed.length === 0) {
+        throw new Error('រកមិនឃើញទិន្នន័យសិស្សក្នុងឯកសារ Excel ទេ! សូមប្រើលំនាំគំរូដែលមាន column: អត្តលេខ, ឈ្មោះ, ភេទ, ថ្នាក់, សាលា');
+      }
+
+      await upsertStudents(school.id, parsed);
+      const updatedList = await fetchStudents(school.id);
+      setStudents(updatedList);
+      setExcelMessage(`បាននាំចូលបញ្ជីឈ្មោះសិស្សចំនួន ${parsed.length} នាក់ដោយជោគជ័យ!`);
+    } catch (err) {
+      setExcelError(err instanceof Error ? err.message : 'មានបញ្ហាក្នុងការអានឯកសារ Excel');
+    } finally {
+      setUploadingExcel(false);
+      if (excelInputRef.current) excelInputRef.current.value = '';
+    }
+  };
+
+  const handleDeleteStudent = async (id: string, name: string) => {
+    if (!window.confirm(`លុបឈ្មោះសិស្ស "${name}"?`)) return;
+    await deleteStudent(id);
+    setStudents(prev => prev.filter(s => s.id !== id));
   };
 
   const filteredTests = tests.filter(t => {
@@ -306,6 +400,15 @@ export const PrincipalPortal: React.FC<PrincipalPortalProps> = ({
             >
               <BarChart3 className="w-4 h-4" />
               <span>ពិន្ទុសិស្ស ({submissions.length})</span>
+            </button>
+            <button
+              onClick={() => setActiveTab('students')}
+              className={`px-3.5 py-2 rounded-xl text-xs font-bold flex items-center gap-1.5 cursor-pointer transition-all ${
+                activeTab === 'students' ? 'bg-indigo-600 text-white shadow-sm' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+              }`}
+            >
+              <Users className="w-4 h-4" />
+              <span>បញ្ជីឈ្មោះសិស្ស ({students.length})</span>
             </button>
             <button
               onClick={() => setActiveTab('subjects')}
@@ -504,6 +607,145 @@ export const PrincipalPortal: React.FC<PrincipalPortalProps> = ({
                 រក្សាទុកលេខកូដ
               </button>
             </form>
+          </div>
+        )}
+
+        {/* TAB STUDENTS ROSTER */}
+        {activeTab === 'students' && (
+          <div className="space-y-4">
+            <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm flex flex-col lg:flex-row lg:items-center justify-between gap-4">
+              <div>
+                <h3 className="font-extrabold text-slate-900 text-base flex items-center gap-2">
+                  <Users className="w-5 h-5 text-indigo-600" />
+                  <span>បញ្ជីឈ្មោះសិស្ស ({students.length} នាក់)</span>
+                </h3>
+                <p className="text-xs text-slate-500 mt-1">
+                  ទាញយកលំនាំគំរូ Excel (អត្តលេខ, ឈ្មោះ, ភេទ, ថ្នាក់, សាលា) រួច Upload ចូលប្រព័ន្ធ
+                </p>
+              </div>
+
+              <div className="flex flex-wrap items-center gap-2.5">
+                <button
+                  type="button"
+                  onClick={handleDownloadStudentTemplate}
+                  className="px-4 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-xl shadow-sm flex items-center gap-2 cursor-pointer"
+                >
+                  <FileSpreadsheet className="w-4 h-4" />
+                  <span>ទាញយកលំនាំគំរូ Excel</span>
+                </button>
+
+                <button
+                  type="button"
+                  disabled={uploadingExcel}
+                  onClick={() => excelInputRef.current?.click()}
+                  className="px-4 py-2.5 bg-indigo-600 hover:bg-indigo-700 disabled:bg-slate-300 text-white text-xs font-bold rounded-xl shadow-sm flex items-center gap-2 cursor-pointer"
+                >
+                  <Upload className="w-4 h-4" />
+                  <span>{uploadingExcel ? 'កំពុង Upload...' : 'Upload Excel'}</span>
+                </button>
+                <input
+                  ref={excelInputRef}
+                  type="file"
+                  accept=".xlsx,.xls,.csv"
+                  hidden
+                  onChange={handleUploadStudentExcel}
+                />
+              </div>
+            </div>
+
+            {excelMessage && (
+              <div className="bg-emerald-50 border border-emerald-200 text-emerald-700 px-4 py-3 rounded-xl text-xs font-bold flex items-center gap-2">
+                <CheckCircle2 className="w-4 h-4 shrink-0" />
+                <span>{excelMessage}</span>
+              </div>
+            )}
+            {excelError && (
+              <div className="bg-rose-50 border border-rose-200 text-rose-700 px-4 py-3 rounded-xl text-xs font-bold flex items-center gap-2">
+                <AlertCircle className="w-4 h-4 shrink-0" />
+                <span>{excelError}</span>
+              </div>
+            )}
+
+            <div className="flex flex-wrap gap-3">
+              <div className="relative flex-1 min-w-[220px]">
+                <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+                <input
+                  type="text"
+                  value={studentSearch}
+                  onChange={(e) => setStudentSearch(e.target.value)}
+                  placeholder="ស្វែងរកតាមអត្តលេខ ឬឈ្មោះសិស្ស..."
+                  className="w-full pl-9 pr-3 py-2 bg-white border border-slate-200 rounded-xl text-xs focus:outline-none focus:border-indigo-500"
+                />
+              </div>
+              <select
+                value={studentGradeFilter}
+                onChange={(e) => setStudentGradeFilter(e.target.value)}
+                className="px-3.5 py-2 bg-white border border-slate-200 rounded-xl text-xs font-bold"
+              >
+                {['ទាំងអស់', ...Array.from(new Set(students.map(s => s.grade).filter(Boolean)))].map(g => (
+                  <option key={g} value={g}>ថ្នាក់៖ {g}</option>
+                ))}
+              </select>
+            </div>
+
+            {(() => {
+              const filteredRoster = students.filter(st => {
+                const gOk = studentGradeFilter === 'ទាំងអស់' || st.grade === studentGradeFilter;
+                const q = studentSearch.toLowerCase();
+                const qOk =
+                  !q ||
+                  st.student_id.toLowerCase().includes(q) ||
+                  st.student_name.toLowerCase().includes(q);
+                return gOk && qOk;
+              });
+
+              if (filteredRoster.length === 0) {
+                return (
+                  <div className="bg-white rounded-2xl border border-dashed border-slate-300 p-10 text-center text-sm text-slate-400">
+                    មិនទាន់មានបញ្ជីឈ្មោះសិស្សទេ។ សូមចុច "ទាញយកលំនាំគំរូ Excel" រួចបំពេញទិន្នន័យ ហើយ "Upload Excel"។
+                  </div>
+                );
+              }
+
+              return (
+                <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden shadow-sm">
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-left border-collapse">
+                      <thead>
+                        <tr className="bg-slate-50 border-b border-slate-200 text-[11px] font-bold text-slate-500 uppercase">
+                          <th className="p-4">អត្តលេខ</th>
+                          <th className="p-4">ឈ្មោះ</th>
+                          <th className="p-4">ភេទ</th>
+                          <th className="p-4">ថ្នាក់</th>
+                          <th className="p-4">សាលា</th>
+                          <th className="p-4 text-right">លុប</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-slate-100 text-sm">
+                        {filteredRoster.map(st => (
+                          <tr key={st.id} className="hover:bg-slate-50/60">
+                            <td className="p-4 font-mono font-bold text-xs text-slate-700">{st.student_id}</td>
+                            <td className="p-4 font-bold text-slate-900">{st.student_name}</td>
+                            <td className="p-4 text-xs text-slate-600">{st.gender || '-'}</td>
+                            <td className="p-4 text-xs font-semibold text-blue-700">{st.grade}</td>
+                            <td className="p-4 text-xs text-slate-500">{st.school_name || school.name}</td>
+                            <td className="p-4 text-right">
+                              <button
+                                onClick={() => handleDeleteStudent(st.id, st.student_name)}
+                                className="p-2 hover:bg-rose-50 text-rose-500 rounded-xl cursor-pointer"
+                                title="លុប"
+                              >
+                                <Trash2 className="w-4 h-4" />
+                              </button>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              );
+            })()}
           </div>
         )}
 

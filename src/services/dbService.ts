@@ -1,5 +1,5 @@
 import { supabase, isSupabaseConfigured } from '../lib/supabase';
-import { School, SubjectItem, SavedTest, StudentSubmission } from '../types';
+import { School, SubjectItem, SavedTest, StudentSubmission, StudentRecord } from '../types';
 
 export const DEFAULT_SUBJECTS = [
   'ភាសាខ្មែរ',
@@ -18,6 +18,7 @@ const LS_KEYS = {
   SUBJECTS: 'ktg_subjects_v1',
   TESTS: 'ktg_tests_v1',
   SUBMISSIONS: 'ktg_submissions_v1',
+  STUDENTS: 'ktg_students_v1',
 };
 
 function readLS<T>(key: string, fallback: T): T {
@@ -296,4 +297,70 @@ export async function submitStudentTest(
   };
   writeLS(LS_KEYS.SUBMISSIONS, [newSub, ...subs]);
   return newSub;
+}
+
+// ==================== STUDENTS ROSTER ====================
+
+export async function fetchStudents(schoolId: string): Promise<StudentRecord[]> {
+  if (isSupabaseConfigured && supabase) {
+    const { data, error } = await supabase
+      .from('students')
+      .select('*')
+      .eq('school_id', schoolId)
+      .order('grade', { ascending: true })
+      .order('student_id', { ascending: true });
+    if (error) throw new Error(error.message);
+    return (data || []) as StudentRecord[];
+  }
+  return readLS<StudentRecord[]>(LS_KEYS.STUDENTS, []).filter(s => s.school_id === schoolId);
+}
+
+export async function upsertStudents(
+  schoolId: string,
+  rows: Omit<StudentRecord, 'id' | 'school_id' | 'created_at'>[]
+): Promise<void> {
+  const cleanRows = rows
+    .filter(r => r.student_id.trim() && r.student_name.trim())
+    .map(r => ({
+      school_id: schoolId,
+      student_id: r.student_id.trim(),
+      student_name: r.student_name.trim(),
+      gender: r.gender.trim(),
+      grade: r.grade.trim(),
+      school_name: r.school_name.trim(),
+    }));
+
+  if (cleanRows.length === 0) return;
+
+  if (isSupabaseConfigured && supabase) {
+    const { error } = await supabase
+      .from('students')
+      .upsert(cleanRows, { onConflict: 'school_id,student_id' });
+    if (error) throw new Error(error.message);
+    return;
+  }
+
+  const existing = readLS<StudentRecord[]>(LS_KEYS.STUDENTS, []);
+  const map = new Map<string, StudentRecord>();
+  existing.forEach(s => map.set(`${s.school_id}:${s.student_id}`, s));
+  cleanRows.forEach(r => {
+    const key = `${r.school_id}:${r.student_id}`;
+    const prev = map.get(key);
+    map.set(key, {
+      id: prev?.id || genId(),
+      created_at: prev?.created_at || new Date().toISOString(),
+      ...r,
+    });
+  });
+  writeLS(LS_KEYS.STUDENTS, Array.from(map.values()));
+}
+
+export async function deleteStudent(id: string): Promise<void> {
+  if (isSupabaseConfigured && supabase) {
+    const { error } = await supabase.from('students').delete().eq('id', id);
+    if (error) throw new Error(error.message);
+    return;
+  }
+  const existing = readLS<StudentRecord[]>(LS_KEYS.STUDENTS, []).filter(s => s.id !== id);
+  writeLS(LS_KEYS.STUDENTS, existing);
 }

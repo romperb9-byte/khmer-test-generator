@@ -93,3 +93,14 @@ export interface StudentSubmission {
   total_questions: number;
   submitted_at?: string;
 }
+
+export interface StudentRecord {
+  id: string;
+  school_id: string;
+  student_id: string;
+  student_name: string;
+  gender: string;
+  grade: string;
+  school_name: string;
+  created_at?: string;
+}

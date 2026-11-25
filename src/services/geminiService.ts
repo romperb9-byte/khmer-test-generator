@@ -79,6 +79,65 @@ const RESPONSE_SCHEMA = {
   required: ["title", "questions"]
 };
 
+async function compressImageBase64(dataUrl: string, maxWidth = 1400): Promise<{ mimeType: string; data: string }> {
+  if (typeof document === 'undefined') {
+    const parts = dataUrl.split(",");
+    return {
+      mimeType: parts[0].match(/:(.*?);/)?.[1] || "image/png",
+      data: parts[1] || parts[0],
+    };
+  }
+
+  return new Promise((resolve) => {
+    const img = new Image();
+    img.onload = () => {
+      let { width, height } = img;
+      if (width > maxWidth) {
+        height = Math.round((height * maxWidth) / width);
+        width = maxWidth;
+      }
+      const canvas = document.createElement('canvas');
+      canvas.width = width;
+      canvas.height = height;
+      const ctx = canvas.getContext('2d');
+      if (ctx) {
+        ctx.drawImage(img, 0, 0, width, height);
+        const compressed = canvas.toDataURL('image/jpeg', 0.82);
+        const parts = compressed.split(',');
+        resolve({ mimeType: 'image/jpeg', data: parts[1] });
+        return;
+      }
+      const parts = dataUrl.split(",");
+      resolve({
+        mimeType: parts[0].match(/:(.*?);/)?.[1] || "image/png",
+        data: parts[1] || parts[0],
+      });
+    };
+    img.onerror = () => {
+      const parts = dataUrl.split(",");
+      resolve({
+        mimeType: parts[0].match(/:(.*?);/)?.[1] || "image/png",
+        data: parts[1] || parts[0],
+      });
+    };
+    img.src = dataUrl;
+  });
+}
+
+async function callWithTimeout<T>(promise: Promise<T>, ms = 60000): Promise<T> {
+  let timer: any;
+  const timeoutPromise = new Promise<never>((_, reject) => {
+    timer = setTimeout(() => {
+      reject(new Error("ការភ្ជាប់ទៅ AI ចំណាយពេលយូរពេក (Timeout)។ សូមព្យាយាមកាត់បន្ថយចំនួនសំណួរ ឬពិនិត្យអ៊ីនធឺណិត/API Key ម្ដងទៀត!"));
+    }, ms);
+  });
+  try {
+    return await Promise.race([promise, timeoutPromise]);
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
 export async function generateTest(options: TestGeneratorOptions): Promise<GeneratedTest> {
   const { grade, subject, material, images, questionCounts, difficultyDistribution, apiKey } = options;
   const ai = resolveGeminiClient(apiKey);
@@ -132,10 +191,8 @@ export async function generateTest(options: TestGeneratorOptions): Promise<Gener
   const contents: any[] = [{ text: prompt }];
   
   if (images && images.length > 0) {
-    images.forEach((imgBase64) => {
-      const parts = imgBase64.split(",");
-      const mimeType = parts[0].match(/:(.*?);/)?.[1] || "image/png";
-      const data = parts[1];
+    const compressedList = await Promise.all(images.map(img => compressImageBase64(img)));
+    compressedList.forEach(({ mimeType, data }) => {
       contents.push({
         inlineData: {
           mimeType,
@@ -145,15 +202,36 @@ export async function generateTest(options: TestGeneratorOptions): Promise<Gener
     });
   }
 
-  const response = await ai.models.generateContent({
-    model: "gemini-3-flash-preview",
-    contents: { parts: contents },
-    config: {
-      responseMimeType: "application/json",
-      responseSchema: RESPONSE_SCHEMA as any,
-      temperature: 0.7,
-    },
-  });
+  let response: any;
+  try {
+    response = await callWithTimeout(
+      ai.models.generateContent({
+        model: "gemini-2.5-flash",
+        contents: { parts: contents },
+        config: {
+          responseMimeType: "application/json",
+          responseSchema: RESPONSE_SCHEMA as any,
+          temperature: 0.7,
+          thinkingConfig: { thinkingBudget: 0 },
+        },
+      }),
+      60000
+    );
+  } catch (primaryErr) {
+    // Fallback to gemini-2.0-flash if 2.5-flash fails
+    response = await callWithTimeout(
+      ai.models.generateContent({
+        model: "gemini-2.0-flash",
+        contents: { parts: contents },
+        config: {
+          responseMimeType: "application/json",
+          responseSchema: RESPONSE_SCHEMA as any,
+          temperature: 0.7,
+        },
+      }),
+      60000
+    );
+  }
 
   if (!response.text) {
     throw new Error("Failed to generate test content. Please try again.");
@@ -265,15 +343,19 @@ export async function gradeOmrSheet(
     text: prompt
   };
 
-  const response = await ai.models.generateContent({
-    model: "gemini-3.5-flash",
-    contents: { parts: [imagePart, textPart] },
-    config: {
-      responseMimeType: "application/json",
-      responseSchema: OMR_RESPONSE_SCHEMA as any,
-      temperature: 0.2, // low temperature for precise factual extraction
-    }
-  });
+  const response = await callWithTimeout(
+    ai.models.generateContent({
+      model: "gemini-2.5-flash",
+      contents: { parts: [imagePart, textPart] },
+      config: {
+        responseMimeType: "application/json",
+        responseSchema: OMR_RESPONSE_SCHEMA as any,
+        temperature: 0.2,
+        thinkingConfig: { thinkingBudget: 0 },
+      }
+    }),
+    60000
+  );
 
   if (!response.text) {
     throw new Error("Failed to scan and grade the OMR sheet. Please ensure the image is clear and try again.");

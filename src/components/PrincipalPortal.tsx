@@ -19,7 +19,9 @@ import {
   FolderOpen,
   Users,
   Upload,
-  FileSpreadsheet
+  FileSpreadsheet,
+  Edit3,
+  X
 } from 'lucide-react';
 import { saveAs } from 'file-saver';
 import * as XLSX from 'xlsx';
@@ -29,12 +31,14 @@ import {
   updateTestSettings,
   deleteTest,
   fetchSubmissions,
+  deleteSubmission,
   fetchSubjects,
   addSubject,
   deleteSubject,
   updateSchool,
   fetchStudents,
   upsertStudents,
+  updateStudent,
   deleteStudent
 } from '../services/dbService';
 import { OmrScanner } from './OmrScanner';
@@ -73,6 +77,16 @@ export const PrincipalPortal: React.FC<PrincipalPortalProps> = ({
   const [excelMessage, setExcelMessage] = useState<string | null>(null);
   const [excelError, setExcelError] = useState<string | null>(null);
   const excelInputRef = React.useRef<HTMLInputElement>(null);
+
+  // View Student Answers Modal & Edit Student Modal
+  const [viewingSubmission, setViewingSubmission] = useState<StudentSubmission | null>(null);
+  const [editingStudent, setEditingStudent] = useState<StudentRecord | null>(null);
+  const [editStudentId, setEditStudentId] = useState('');
+  const [editStudentName, setEditStudentName] = useState('');
+  const [editStudentGender, setEditStudentGender] = useState('');
+  const [editStudentGrade, setEditStudentGrade] = useState('');
+  const [editStudentSchool, setEditStudentSchool] = useState('');
+  const [limitTestId, setLimitTestId] = useState('');
 
   // Access Codes state
   const [teacherCode, setTeacherCode] = useState(school.teacher_code || '1111');
@@ -257,6 +271,40 @@ export const PrincipalPortal: React.FC<PrincipalPortalProps> = ({
     if (!window.confirm(`លុបឈ្មោះសិស្ស "${name}"?`)) return;
     await deleteStudent(id);
     setStudents(prev => prev.filter(s => s.id !== id));
+  };
+
+  const openEditStudent = (st: StudentRecord) => {
+    setEditingStudent(st);
+    setEditStudentId(st.student_id);
+    setEditStudentName(st.student_name);
+    setEditStudentGender(st.gender || '');
+    setEditStudentGrade(st.grade || '');
+    setEditStudentSchool(st.school_name || school.name);
+  };
+
+  const handleSaveEditStudent = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingStudent || !editStudentId.trim() || !editStudentName.trim()) return;
+    const updated = await updateStudent(editingStudent.id, {
+      student_id: editStudentId.trim(),
+      student_name: editStudentName.trim(),
+      gender: editStudentGender.trim(),
+      grade: editStudentGrade.trim(),
+      school_name: editStudentSchool.trim() || school.name,
+    });
+    setStudents(prev => prev.map(s => (s.id === updated.id ? updated : s)));
+    setEditingStudent(null);
+  };
+
+  const handleDeleteSubmission = async (id: string, studentName: string) => {
+    if (!window.confirm(`តើអ្នកចង់លុបលទ្ធផលប្រឡងរបស់ "${studentName}" មែនទេ?`)) return;
+    await deleteSubmission(id);
+    setSubmissions(prev => prev.filter(s => s.id !== id));
+  };
+
+  const handleChangeMaxAttempts = async (testId: string, maxAttempts: number) => {
+    const updated = await updateTestSettings(testId, { max_attempts: maxAttempts });
+    setTests(prev => prev.map(t => (t.id === testId ? updated : t)));
   };
 
   const filteredTests = tests.filter(t => {
@@ -473,6 +521,7 @@ export const PrincipalPortal: React.FC<PrincipalPortalProps> = ({
                         <th className="p-4">គ្រូបង្រៀន</th>
                         <th className="p-4 text-center">បើកឱ្យសិស្សប្រឡង</th>
                         <th className="p-4 text-center">ឃើញពិន្ទុភ្លាមៗ</th>
+                        <th className="p-4 text-center">ចំនួនដងប្រឡង</th>
                         <th className="p-4 text-right">សកម្មភាព</th>
                       </tr>
                     </thead>
@@ -513,6 +562,19 @@ export const PrincipalPortal: React.FC<PrincipalPortalProps> = ({
                               {t.show_score_immediately ? <Eye className="w-3.5 h-3.5" /> : <EyeOff className="w-3.5 h-3.5" />}
                               <span>{t.show_score_immediately ? 'បង្ហាញភ្លាមៗ' : 'លាក់ពិន្ទុ'}</span>
                             </button>
+                          </td>
+                          <td className="p-4 text-center">
+                            <select
+                              value={t.max_attempts ?? 0}
+                              onChange={(e) => handleChangeMaxAttempts(t.id, Number(e.target.value))}
+                              className="px-2.5 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-xs font-bold text-slate-700"
+                            >
+                              <option value={0}>មិនកំណត់</option>
+                              <option value={1}>១ ដង</option>
+                              <option value={2}>២ ដង</option>
+                              <option value={3}>៣ ដង</option>
+                              <option value={5}>៥ ដង</option>
+                            </select>
                           </td>
                           <td className="p-4 text-right space-x-1">
                             {onLoadTestToGenerator && (
@@ -718,7 +780,7 @@ export const PrincipalPortal: React.FC<PrincipalPortalProps> = ({
                           <th className="p-4">ភេទ</th>
                           <th className="p-4">ថ្នាក់</th>
                           <th className="p-4">សាលា</th>
-                          <th className="p-4 text-right">លុប</th>
+                          <th className="p-4 text-right">កែប្រែ / លុប</th>
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-slate-100 text-sm">
@@ -729,10 +791,17 @@ export const PrincipalPortal: React.FC<PrincipalPortalProps> = ({
                             <td className="p-4 text-xs text-slate-600">{st.gender || '-'}</td>
                             <td className="p-4 text-xs font-semibold text-blue-700">{st.grade}</td>
                             <td className="p-4 text-xs text-slate-500">{st.school_name || school.name}</td>
-                            <td className="p-4 text-right">
+                            <td className="p-4 text-right space-x-1">
+                              <button
+                                onClick={() => openEditStudent(st)}
+                                className="p-2 hover:bg-blue-50 text-blue-600 rounded-xl cursor-pointer inline-flex align-middle"
+                                title="កែប្រែព័ត៌មានសិស្ស"
+                              >
+                                <Edit3 className="w-4 h-4" />
+                              </button>
                               <button
                                 onClick={() => handleDeleteStudent(st.id, st.student_name)}
-                                className="p-2 hover:bg-rose-50 text-rose-500 rounded-xl cursor-pointer"
+                                className="p-2 hover:bg-rose-50 text-rose-500 rounded-xl cursor-pointer inline-flex align-middle"
                                 title="លុប"
                               >
                                 <Trash2 className="w-4 h-4" />
@@ -752,6 +821,45 @@ export const PrincipalPortal: React.FC<PrincipalPortalProps> = ({
         {/* TAB 2: STUDENT SCORES & EXPORT */}
         {activeTab === 'scores' && (
           <div className="space-y-4">
+            {/* Max Attempts Setting Bar */}
+            {tests.length > 0 && (
+              <div className="bg-white p-4 rounded-2xl border border-slate-200 flex flex-wrap items-center justify-between gap-3">
+                <div className="text-xs font-bold text-slate-700">
+                  កំណត់ចំនួនដងនៃការធ្វើតេស្ដសម្រាប់សិស្ស៖
+                </div>
+                <div className="flex flex-wrap items-center gap-2">
+                  <select
+                    value={limitTestId || tests[0]?.id || ''}
+                    onChange={(e) => setLimitTestId(e.target.value)}
+                    className="px-3 py-2 border border-slate-200 rounded-xl text-xs font-semibold bg-slate-50 max-w-xs"
+                  >
+                    {tests.map(t => (
+                      <option key={t.id} value={t.id}>
+                        {t.title} ({t.grade} - {t.subject})
+                      </option>
+                    ))}
+                  </select>
+                  {(() => {
+                    const targetTest = tests.find(t => t.id === (limitTestId || tests[0]?.id));
+                    if (!targetTest) return null;
+                    return (
+                      <select
+                        value={targetTest.max_attempts ?? 0}
+                        onChange={(e) => handleChangeMaxAttempts(targetTest.id, Number(e.target.value))}
+                        className="px-3 py-2 border border-indigo-200 rounded-xl text-xs font-bold bg-indigo-50 text-indigo-700"
+                      >
+                        <option value={0}>មិនកំណត់ចំនួនដង</option>
+                        <option value={1}>អនុញ្ញាត ១ ដង</option>
+                        <option value={2}>អនុញ្ញាត ២ ដង</option>
+                        <option value={3}>អនុញ្ញាត ៣ ដង</option>
+                        <option value={5}>អនុញ្ញាត ៥ ដង</option>
+                      </select>
+                    );
+                  })()}
+                </div>
+              </div>
+            )}
+
             <div className="bg-white p-4 rounded-2xl border border-slate-200 flex flex-col lg:flex-row lg:items-center justify-between gap-3">
               <div className="flex flex-wrap items-center gap-2.5 flex-1">
                 <div className="relative flex-1 min-w-[200px]">
@@ -807,6 +915,7 @@ export const PrincipalPortal: React.FC<PrincipalPortalProps> = ({
                         <th className="p-4 text-center">ចម្លើយត្រូវ</th>
                         <th className="p-4 text-center">ពិន្ទុ (លើ ១០)</th>
                         <th className="p-4 text-right">ពេលវេលាបញ្ជូន</th>
+                        <th className="p-4 text-right">មើលចម្លើយ / លុប</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-100 text-sm">
@@ -831,6 +940,23 @@ export const PrincipalPortal: React.FC<PrincipalPortalProps> = ({
                           </td>
                           <td className="p-4 text-right text-xs text-slate-400">
                             {s.submitted_at ? new Date(s.submitted_at).toLocaleString('km-KH') : '-'}
+                          </td>
+                          <td className="p-4 text-right space-x-1 whitespace-nowrap">
+                            <button
+                              onClick={() => setViewingSubmission(s)}
+                              className="px-2.5 py-1.5 bg-blue-50 hover:bg-blue-100 text-blue-700 rounded-lg text-xs font-bold inline-flex items-center gap-1 cursor-pointer"
+                              title="មើលចម្លើយសិស្ស"
+                            >
+                              <Eye className="w-3.5 h-3.5" />
+                              <span>មើលចម្លើយ</span>
+                            </button>
+                            <button
+                              onClick={() => handleDeleteSubmission(s.id, s.student_name)}
+                              className="p-2 hover:bg-rose-50 text-rose-500 rounded-xl cursor-pointer inline-flex align-middle"
+                              title="លុបលទ្ធផលសិស្ស"
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </button>
                           </td>
                         </tr>
                       ))}
@@ -889,6 +1015,151 @@ export const PrincipalPortal: React.FC<PrincipalPortalProps> = ({
           </div>
         )}
       </div>
+
+      {/* Modal: View Student Answers */}
+      {viewingSubmission && (
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-3xl max-w-3xl w-full max-h-[88vh] flex flex-col shadow-2xl overflow-hidden">
+            <div className="px-6 py-4 border-b border-slate-100 bg-slate-50 flex items-center justify-between">
+              <div>
+                <h3 className="font-extrabold text-slate-900 text-base">
+                  ចម្លើយរបស់សិស្ស៖ {viewingSubmission.student_name} ({viewingSubmission.student_id})
+                </h3>
+                <p className="text-xs text-slate-500">
+                  {viewingSubmission.grade} • {viewingSubmission.subject} • {viewingSubmission.test_title} • ពិន្ទុ៖{' '}
+                  <span className="font-bold text-indigo-700">{viewingSubmission.score} / {viewingSubmission.total_points}</span>
+                </p>
+              </div>
+              <button
+                onClick={() => setViewingSubmission(null)}
+                className="p-2 hover:bg-slate-200 rounded-xl text-slate-400 cursor-pointer"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            <div className="p-6 overflow-y-auto space-y-4">
+              {(() => {
+                const matchedTest = tests.find(t => t.id === viewingSubmission.test_id);
+                if (!matchedTest) {
+                  return (
+                    <pre className="text-xs bg-slate-50 p-4 rounded-xl overflow-x-auto">
+                      {JSON.stringify(viewingSubmission.answers, null, 2)}
+                    </pre>
+                  );
+                }
+                return matchedTest.questions.map((q, idx) => {
+                  const rawAns = viewingSubmission.answers?.[q.id];
+                  const formattedStudentAns =
+                    typeof rawAns === 'object' && rawAns !== null
+                      ? Object.entries(rawAns).map(([k, v]) => `${Number(k) + 1}-${v}`).join(', ')
+                      : String(rawAns || 'មិនបានឆ្លើយ');
+                  const formattedCorrect =
+                    typeof q.answer === 'object' ? JSON.stringify(q.answer) : String(q.answer || '');
+                  return (
+                    <div key={q.id} className="p-4 rounded-2xl border border-slate-200 bg-slate-50/50 space-y-2">
+                      <p className="font-bold text-sm text-slate-900">
+                        {idx + 1}. {q.question}
+                      </p>
+                      <div className="flex flex-wrap gap-4 text-xs">
+                        <span className="px-2.5 py-1 rounded-lg bg-blue-50 text-blue-800 font-semibold">
+                          ចម្លើយសិស្ស៖ {formattedStudentAns}
+                        </span>
+                        <span className="px-2.5 py-1 rounded-lg bg-emerald-50 text-emerald-800 font-semibold">
+                          ចម្លើយត្រឹមត្រូវ៖ {formattedCorrect}
+                        </span>
+                      </div>
+                    </div>
+                  );
+                });
+              })()}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal: Edit Student Info */}
+      {editingStudent && (
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-3xl max-w-md w-full p-6 shadow-2xl space-y-5">
+            <div className="flex items-center justify-between">
+              <h3 className="font-extrabold text-slate-900 text-base">កែប្រែព័ត៌មានសិស្ស</h3>
+              <button
+                onClick={() => setEditingStudent(null)}
+                className="p-2 hover:bg-slate-100 rounded-xl text-slate-400 cursor-pointer"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            <form onSubmit={handleSaveEditStudent} className="space-y-3.5">
+              <div>
+                <label className="block text-xs font-bold text-slate-700 mb-1">អត្តលេខ *</label>
+                <input
+                  type="text"
+                  required
+                  value={editStudentId}
+                  onChange={(e) => setEditStudentId(e.target.value)}
+                  className="w-full px-3.5 py-2 border border-slate-200 rounded-xl text-sm"
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-bold text-slate-700 mb-1">ឈ្មោះសិស្ស *</label>
+                <input
+                  type="text"
+                  required
+                  value={editStudentName}
+                  onChange={(e) => setEditStudentName(e.target.value)}
+                  className="w-full px-3.5 py-2 border border-slate-200 rounded-xl text-sm"
+                />
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 mb-1">ភេទ</label>
+                  <input
+                    type="text"
+                    value={editStudentGender}
+                    onChange={(e) => setEditStudentGender(e.target.value)}
+                    placeholder="ប្រុស / ស្រី"
+                    className="w-full px-3.5 py-2 border border-slate-200 rounded-xl text-sm"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 mb-1">ថ្នាក់</label>
+                  <input
+                    type="text"
+                    value={editStudentGrade}
+                    onChange={(e) => setEditStudentGrade(e.target.value)}
+                    className="w-full px-3.5 py-2 border border-slate-200 rounded-xl text-sm"
+                  />
+                </div>
+              </div>
+              <div>
+                <label className="block text-xs font-bold text-slate-700 mb-1">សាលា</label>
+                <input
+                  type="text"
+                  value={editStudentSchool}
+                  onChange={(e) => setEditStudentSchool(e.target.value)}
+                  className="w-full px-3.5 py-2 border border-slate-200 rounded-xl text-sm"
+                />
+              </div>
+              <div className="flex gap-2.5 pt-2">
+                <button
+                  type="button"
+                  onClick={() => setEditingStudent(null)}
+                  className="flex-1 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold rounded-xl cursor-pointer"
+                >
+                  បោះបង់
+                </button>
+                <button
+                  type="submit"
+                  className="flex-1 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold rounded-xl cursor-pointer"
+                >
+                  រក្សាទុក
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

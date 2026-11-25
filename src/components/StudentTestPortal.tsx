@@ -15,7 +15,7 @@ import {
   AlertCircle
 } from 'lucide-react';
 import { School, SavedTest, Question, QuestionType, StudentSubmission, StudentRecord } from '../types';
-import { fetchTests, fetchSubjects, submitStudentTest, fetchStudents } from '../services/dbService';
+import { fetchTests, fetchSubjects, submitStudentTest, fetchStudents, countStudentAttempts } from '../services/dbService';
 import { preprocessMathForDisplay } from '../utils/mathUtils';
 
 const GRADES = Array.from({ length: 12 }, (_, i) => `ថ្នាក់ទី ${i + 1}`);
@@ -151,12 +151,23 @@ export const StudentTestPortal: React.FC<StudentTestPortalProps> = ({ school }) 
     t => t.grade === grade && (!subject || t.subject === subject)
   );
 
-  const handleStartTest = (test: SavedTest) => {
+  const handleStartTest = async (test: SavedTest) => {
     if (!studentId.trim() || !studentName.trim()) {
       setError('សូមបញ្ចូល អត្តលេខ និងឈ្មោះសិស្ស ជាមុនសិន!');
       return;
     }
     setError(null);
+    if (test.max_attempts && test.max_attempts > 0) {
+      try {
+        const used = await countStudentAttempts(school.id, test.id, studentId);
+        if (used >= test.max_attempts) {
+          setError(`សិស្សអត្តលេខ ${studentId} បានធ្វើតេស្ដ "${test.title}" គ្រប់ចំនួនកំណត់ (${test.max_attempts} ដង) រួចហើយ!`);
+          return;
+        }
+      } catch {
+        // ignore check failure
+      }
+    }
     setActiveTest(test);
     setAnswers({});
     setSecondsLeft((test.duration || 60) * 60);

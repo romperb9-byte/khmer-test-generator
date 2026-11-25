@@ -230,7 +230,7 @@ export async function saveTest(input: Omit<SavedTest, 'id' | 'created_at'>): Pro
 
 export async function updateTestSettings(
   id: string,
-  updates: Partial<Pick<SavedTest, 'is_published' | 'show_score_immediately' | 'title' | 'duration'>>
+  updates: Partial<Pick<SavedTest, 'is_published' | 'show_score_immediately' | 'max_attempts' | 'title' | 'duration'>>
 ): Promise<SavedTest> {
   if (isSupabaseConfigured && supabase) {
     const { data, error } = await supabase
@@ -299,6 +299,36 @@ export async function submitStudentTest(
   return newSub;
 }
 
+export async function deleteSubmission(id: string): Promise<void> {
+  if (isSupabaseConfigured && supabase) {
+    const { error } = await supabase.from('submissions').delete().eq('id', id);
+    if (error) throw new Error(error.message);
+    return;
+  }
+  const subs = readLS<StudentSubmission[]>(LS_KEYS.SUBMISSIONS, []).filter(s => s.id !== id);
+  writeLS(LS_KEYS.SUBMISSIONS, subs);
+}
+
+export async function countStudentAttempts(
+  schoolId: string,
+  testId: string,
+  studentId: string
+): Promise<number> {
+  const cleanSid = studentId.trim().toLowerCase();
+  if (isSupabaseConfigured && supabase) {
+    const { data, error } = await supabase
+      .from('submissions')
+      .select('student_id')
+      .eq('school_id', schoolId)
+      .eq('test_id', testId);
+    if (error) throw new Error(error.message);
+    return (data || []).filter((r: any) => String(r.student_id || '').trim().toLowerCase() === cleanSid).length;
+  }
+  return readLS<StudentSubmission[]>(LS_KEYS.SUBMISSIONS, []).filter(
+    s => s.school_id === schoolId && s.test_id === testId && s.student_id.trim().toLowerCase() === cleanSid
+  ).length;
+}
+
 // ==================== STUDENTS ROSTER ====================
 
 export async function fetchStudents(schoolId: string): Promise<StudentRecord[]> {
@@ -353,6 +383,29 @@ export async function upsertStudents(
     });
   });
   writeLS(LS_KEYS.STUDENTS, Array.from(map.values()));
+}
+
+export async function updateStudent(
+  id: string,
+  updates: Partial<Omit<StudentRecord, 'id' | 'school_id' | 'created_at'>>
+): Promise<StudentRecord> {
+  if (isSupabaseConfigured && supabase) {
+    const { data, error } = await supabase
+      .from('students')
+      .update(updates)
+      .eq('id', id)
+      .select()
+      .single();
+    if (error) throw new Error(error.message);
+    return data as StudentRecord;
+  }
+
+  const existing = readLS<StudentRecord[]>(LS_KEYS.STUDENTS, []);
+  const updated = existing.map(s => (s.id === id ? { ...s, ...updates } : s));
+  writeLS(LS_KEYS.STUDENTS, updated);
+  const found = updated.find(s => s.id === id);
+  if (!found) throw new Error('រកមិនឃើញទិន្នន័យសិស្ស');
+  return found;
 }
 
 export async function deleteStudent(id: string): Promise<void> {

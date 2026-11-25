@@ -74,6 +74,7 @@ export interface SavedTest extends GeneratedTest {
   duration: number;
   is_published: boolean;
   show_score_immediately: boolean;
+  max_attempts?: number;
   created_at?: string;
 }
 

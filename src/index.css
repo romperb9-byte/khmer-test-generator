@@ -1,0 +1,35 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Kantumruy+Pro:wght@400;700&family=Khmer+OS+Freehand&family=Khmer+OS+Mool+Light&display=swap');
+@import "tailwindcss";
+
+@theme {
+  --font-sans: "Inter", "Kantumruy Pro", ui-sans-serif, system-ui, sans-serif;
+  --color-brand-primary: #2563eb;
+  --color-brand-secondary: #1e293b;
+  --color-brand-background: #f8fafc;
+}
+
+@layer base {
+  body {
+    @apply bg-brand-background text-slate-900 antialiased;
+  }
+  
+  .markdown-body p {
+    @apply m-0;
+  }
+  
+  .markdown-body .katex-display {
+    @apply my-2 overflow-x-auto;
+  }
+  
+  .markdown-body .katex {
+    @apply text-[1.1em] leading-none;
+  }
+
+  .pdf-content {
+    @apply p-8 bg-white text-black;
+  }
+
+  .young-grade-decor {
+    @apply border-8 border-blue-100 rounded-[3rem] p-10 bg-white shadow-none;
+  }
+}

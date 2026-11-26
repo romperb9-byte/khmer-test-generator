@@ -76,8 +76,12 @@ export default function App() {
   const [material, setMaterial] = useState('');
   const [images, setImages] = useState<string[]>([]);
   const [questionCounts, setQuestionCounts] = useState<{ [key in QuestionType]?: number }>({
-    [QuestionType.MULTIPLE_CHOICE]: 5,
+    [QuestionType.TRUE_FALSE]: 2,
+    [QuestionType.MATCHING]: 2,
+    [QuestionType.MULTIPLE_CHOICE]: 2,
+    [QuestionType.FILL_BLANKS]: 2,
     [QuestionType.SHORT_ANSWER]: 2,
+    [QuestionType.LONG_ANSWER]: 2,
   });
   const [isGenerating, setIsGenerating] = useState(false);
   const [showGoogleFormModal, setShowGoogleFormModal] = useState(false);
@@ -232,7 +236,7 @@ export default function App() {
       if (newCounts[type]) {
         delete newCounts[type];
       } else {
-        newCounts[type] = 5;
+        newCounts[type] = 2;
       }
       return newCounts;
     });

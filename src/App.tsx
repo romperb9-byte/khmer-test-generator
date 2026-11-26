@@ -85,6 +85,7 @@ export default function App() {
   const [test, setTest] = useState<GeneratedTest | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [activeMode, setActiveMode] = useState<'hub' | 'generator' | 'student' | 'principal'>('hub');
+  const [isStudentExamFullscreen, setIsStudentExamFullscreen] = useState(false);
   const [studentOmrData, setStudentOmrData] = useState<{
     questionCount: number;
     answerType: 'ABCD' | 'KHKK';
@@ -355,86 +356,88 @@ export default function App() {
 
   return (
     <div className="h-screen flex flex-col bg-slate-50 overflow-hidden font-sans text-slate-900 selection:bg-blue-100">
-      {/* Header */}
-      <header className="fixed top-0 left-0 right-0 h-20 bg-[#1e293b] text-white flex items-center justify-between px-4 md:px-6 shadow-xl z-[100] print:hidden gap-3">
-        <div className="flex items-center gap-3 shrink-0">
-          <button
-            onClick={() => { setCurrentSchool(null); setTest(null); }}
-            className="p-2.5 bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white rounded-xl transition-all cursor-pointer"
-            title="ត្រឡប់ទៅទំព័រដើម (សាលារៀន)"
-          >
-            <Home className="w-5 h-5" />
-          </button>
-          <div className="flex flex-col">
-            <h1 className="text-sm md:text-base font-bold tracking-tight leading-none truncate max-w-[180px] md:max-w-[260px]">
-              {currentSchool.name}
-            </h1>
-            <span className="text-[10px] text-blue-300 font-medium mt-1">
-              {activeMode === 'hub' && 'ផ្ទាំងមុខងារសាលា'}
-              {activeMode === 'generator' && 'ផ្នែកគ្រូបង្រៀន • បង្កើតតេស្ដ'}
-              {activeMode === 'student' && 'ផ្នែកសិស្ស • តេស្ដសិស្ស'}
-              {activeMode === 'principal' && 'ផ្នែកនាយកសាលា / លេខា'}
-            </span>
-          </div>
-        </div>
-
-        <div className="flex items-center gap-2">
-          {activeMode !== 'hub' && (
+      {/* Header - hidden when student is actively taking/viewing exam */}
+      {!isStudentExamFullscreen && (
+        <header className="fixed top-0 left-0 right-0 h-14 md:h-20 bg-[#1e293b] text-white flex items-center justify-between px-3 md:px-6 shadow-xl z-[100] print:hidden gap-2 md:gap-3">
+          <div className="flex items-center gap-2.5 md:gap-3 shrink-0">
             <button
-              onClick={() => setActiveMode('hub')}
-              className="px-3.5 py-2 bg-slate-800 hover:bg-slate-700 text-slate-200 hover:text-white rounded-xl text-xs font-bold flex items-center gap-1.5 transition-all cursor-pointer"
+              onClick={() => { setCurrentSchool(null); setTest(null); setIsStudentExamFullscreen(false); }}
+              className="p-2 md:p-2.5 bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white rounded-xl transition-all cursor-pointer"
+              title="ត្រឡប់ទៅទំព័រដើម (សាលារៀន)"
             >
-              <FolderOpen className="w-4 h-4 text-blue-400" />
-              <span>មុខងារសាលា</span>
+              <Home className="w-4 h-4 md:w-5 md:h-5" />
             </button>
-          )}
-
-          {activeMode === 'generator' && (
-            <div className="flex items-center gap-1.5 bg-slate-800/50 p-1.5 rounded-2xl border border-white/5 shrink-0">
-              <button 
-                onClick={handleExportWord}
-                disabled={!test}
-                className="flex items-center gap-1.5 px-3 py-2 rounded-xl hover:bg-blue-500/10 text-blue-400 hover:text-white transition-all disabled:opacity-20 disabled:cursor-not-allowed cursor-pointer"
-                title="Export Word"
-              >
-                <FileCode className="w-4 h-4" />
-                <span className="text-xs font-bold uppercase hidden xl:block">Word</span>
-              </button>
-
-              <button 
-                onClick={handleExportCSV}
-                disabled={!test}
-                className="flex items-center gap-1.5 px-3 py-2 rounded-xl hover:bg-blue-500/10 text-blue-400 hover:text-white transition-all disabled:opacity-20 disabled:cursor-not-allowed cursor-pointer"
-                title="Export CSV"
-              >
-                <FileSpreadsheet className="w-4 h-4" />
-                <span className="text-xs font-bold uppercase hidden xl:block">CSV</span>
-              </button>
-
-              <button 
-                onClick={handleCreateGoogleForm}
-                disabled={!test}
-                className="flex items-center gap-1.5 px-3 py-2 rounded-xl hover:bg-blue-500/10 text-blue-400 hover:text-white transition-all disabled:opacity-20 disabled:cursor-not-allowed cursor-pointer"
-                title="បង្កើតវិញ្ញាសាជា Web App"
-              >
-                <Globe className="w-4 h-4" />
-                <span className="text-xs font-bold uppercase hidden xl:block">Web App</span>
-              </button>
-
-              <button 
-                onClick={() => { setTest(null); setMaterial(''); setImages([]); }}
-                disabled={!test && !material && images.length === 0}
-                className="flex items-center gap-1.5 px-3 py-2 rounded-xl hover:bg-rose-600 bg-blue-500/20 text-blue-400 hover:text-white transition-all disabled:opacity-20 disabled:cursor-not-allowed cursor-pointer"
-                title="Clear All"
-              >
-                <Trash2 className="w-4 h-4" />
-              </button>
+            <div className="flex flex-col">
+              <h1 className="text-xs md:text-base font-bold tracking-tight leading-none truncate max-w-[150px] md:max-w-[260px]">
+                {currentSchool.name}
+              </h1>
+              <span className="text-[10px] text-blue-300 font-medium mt-0.5 md:mt-1 hidden sm:block">
+                {activeMode === 'hub' && 'ផ្ទាំងមុខងារសាលា'}
+                {activeMode === 'generator' && 'ផ្នែកគ្រូបង្រៀន • បង្កើតតេស្ដ'}
+                {activeMode === 'student' && 'ផ្នែកសិស្ស • តេស្ដសិស្ស'}
+                {activeMode === 'principal' && 'ផ្នែកនាយកសាលា / លេខា'}
+              </span>
             </div>
-          )}
-        </div>
-      </header>
+          </div>
 
-      <main className="flex-1 flex overflow-hidden print:block print:overflow-visible mt-20">
+          <div className="flex items-center gap-2">
+            {activeMode !== 'hub' && (
+              <button
+                onClick={() => { setActiveMode('hub'); setIsStudentExamFullscreen(false); }}
+                className="px-3 py-1.5 md:px-3.5 md:py-2 bg-slate-800 hover:bg-slate-700 text-slate-200 hover:text-white rounded-xl text-xs font-bold flex items-center gap-1.5 transition-all cursor-pointer"
+              >
+                <FolderOpen className="w-4 h-4 text-blue-400" />
+                <span>មុខងារសាលា</span>
+              </button>
+            )}
+
+            {activeMode === 'generator' && (
+              <div className="flex items-center gap-1.5 bg-slate-800/50 p-1 md:p-1.5 rounded-2xl border border-white/5 shrink-0">
+                <button 
+                  onClick={handleExportWord}
+                  disabled={!test}
+                  className="flex items-center gap-1.5 px-2.5 md:px-3 py-1.5 md:py-2 rounded-xl hover:bg-blue-500/10 text-blue-400 hover:text-white transition-all disabled:opacity-20 disabled:cursor-not-allowed cursor-pointer"
+                  title="Export Word"
+                >
+                  <FileCode className="w-4 h-4" />
+                  <span className="text-xs font-bold uppercase hidden xl:block">Word</span>
+                </button>
+
+                <button 
+                  onClick={handleExportCSV}
+                  disabled={!test}
+                  className="flex items-center gap-1.5 px-2.5 md:px-3 py-1.5 md:py-2 rounded-xl hover:bg-blue-500/10 text-blue-400 hover:text-white transition-all disabled:opacity-20 disabled:cursor-not-allowed cursor-pointer"
+                  title="Export CSV"
+                >
+                  <FileSpreadsheet className="w-4 h-4" />
+                  <span className="text-xs font-bold uppercase hidden xl:block">CSV</span>
+                </button>
+
+                <button 
+                  onClick={handleCreateGoogleForm}
+                  disabled={!test}
+                  className="flex items-center gap-1.5 px-2.5 md:px-3 py-1.5 md:py-2 rounded-xl hover:bg-blue-500/10 text-blue-400 hover:text-white transition-all disabled:opacity-20 disabled:cursor-not-allowed cursor-pointer"
+                  title="បង្កើតវិញ្ញាសាជា Web App"
+                >
+                  <Globe className="w-4 h-4" />
+                  <span className="text-xs font-bold uppercase hidden xl:block">Web App</span>
+                </button>
+
+                <button 
+                  onClick={() => { setTest(null); setMaterial(''); setImages([]); }}
+                  disabled={!test && !material && images.length === 0}
+                  className="flex items-center gap-1.5 px-2.5 md:px-3 py-1.5 md:py-2 rounded-xl hover:bg-rose-600 bg-blue-500/20 text-blue-400 hover:text-white transition-all disabled:opacity-20 disabled:cursor-not-allowed cursor-pointer"
+                  title="Clear All"
+                >
+                  <Trash2 className="w-4 h-4" />
+                </button>
+              </div>
+            )}
+          </div>
+        </header>
+      )}
+
+      <main className={`flex-1 flex overflow-hidden print:block print:overflow-visible ${isStudentExamFullscreen ? 'mt-0' : 'mt-14 md:mt-20'}`}>
         {activeMode === 'hub' ? (
           <SchoolHub
             school={currentSchool}
@@ -443,7 +446,7 @@ export default function App() {
             onEnterPrincipal={() => setActiveMode('principal')}
           />
         ) : activeMode === 'student' ? (
-          <StudentTestPortal school={currentSchool} />
+          <StudentTestPortal school={currentSchool} onExamModeChange={setIsStudentExamFullscreen} />
         ) : activeMode === 'principal' ? (
           <PrincipalPortal
             school={currentSchool}
@@ -847,7 +850,8 @@ export default function App() {
         )}
       </main>
 
-      <footer className="h-10 bg-white border-t border-slate-200 px-8 flex items-center justify-between text-[11px] font-bold text-slate-400 print:hidden shrink-0">
+      {!isStudentExamFullscreen && (
+        <footer className="hidden md:flex h-10 bg-white border-t border-slate-200 px-8 items-center justify-between text-[11px] font-bold text-slate-400 print:hidden shrink-0">
         <div className="flex gap-4 items-center">
           <span className="text-blue-500">ប្រព័ន្ធបង្កើតវិញ្ញាសា V1.0</span>
           <span>|</span>
@@ -861,6 +865,7 @@ export default function App() {
           <span className="text-slate-800">Version 2.4.0 (Stable)</span>
         </div>
       </footer>
+      )}
 
       <GoogleFormModal 
         isOpen={showGoogleFormModal} 

@@ -23,6 +23,7 @@ const EXAM_MONTHS = ['ធ្នូ', 'មករា', 'កុម្ភៈ', 'ម�
 
 interface StudentTestPortalProps {
   school: School;
+  onExamModeChange?: (inExam: boolean) => void;
 }
 
 function normalizeAnswerStr(val: string): string {
@@ -95,7 +96,7 @@ function isQuestionCorrect(
   return false;
 }
 
-export const StudentTestPortal: React.FC<StudentTestPortalProps> = ({ school }) => {
+export const StudentTestPortal: React.FC<StudentTestPortalProps> = ({ school, onExamModeChange }) => {
   const [step, setStep] = useState<'setup' | 'exam' | 'result'>('setup');
   const [grade, setGrade] = useState(GRADES[11]);
   const [studentId, setStudentId] = useState('');
@@ -139,6 +140,12 @@ export const StudentTestPortal: React.FC<StudentTestPortalProps> = ({ school }) 
     };
     load();
   }, [school.id]);
+
+  // Notify parent when entering/leaving active exam for full-screen mode
+  useEffect(() => {
+    onExamModeChange?.(step === 'exam' || step === 'result');
+    return () => onExamModeChange?.(false);
+  }, [step, onExamModeChange]);
 
   // Timer countdown
   useEffect(() => {
@@ -275,29 +282,29 @@ export const StudentTestPortal: React.FC<StudentTestPortalProps> = ({ school }) 
   if (step === 'exam' && activeTest) {
     return (
       <div className="flex-1 overflow-y-auto bg-slate-50 pb-20">
-        {/* Sticky Exam Header */}
-        <div className="sticky top-0 z-30 bg-white border-b border-slate-200 px-6 py-4 shadow-sm">
-          <div className="max-w-4xl mx-auto flex flex-wrap items-center justify-between gap-4">
-            <div>
-              <h2 className="font-extrabold text-slate-900 text-base md:text-lg">{activeTest.title}</h2>
-              <p className="text-xs text-slate-500">
-                {studentName} (អត្តលេខ៖ {studentId}) • {grade} • {activeTest.subject}
+        {/* Sticky Exam Header (compact on mobile for full-screen feel) */}
+        <div className="sticky top-0 z-30 bg-white border-b border-slate-200 px-3 py-2.5 md:px-6 md:py-3.5 shadow-sm">
+          <div className="max-w-4xl mx-auto flex items-center justify-between gap-2 md:gap-4">
+            <div className="min-w-0 flex-1">
+              <h2 className="font-extrabold text-slate-900 text-sm md:text-lg truncate">{activeTest.title}</h2>
+              <p className="text-[11px] md:text-xs text-slate-500 truncate">
+                {studentName} ({studentId}) • {grade} • {activeTest.subject}
               </p>
             </div>
-            <div className="flex items-center gap-3">
-              <div className={`px-3.5 py-2 rounded-xl font-mono text-sm font-extrabold flex items-center gap-2 ${
+            <div className="flex items-center gap-2 md:gap-3 shrink-0">
+              <div className={`px-2.5 py-1.5 md:px-3.5 md:py-2 rounded-xl font-mono text-xs md:text-sm font-extrabold flex items-center gap-1.5 ${
                 secondsLeft < 300 ? 'bg-rose-50 text-rose-600 border border-rose-200' : 'bg-blue-50 text-blue-700 border border-blue-200'
               }`}>
-                <Clock className="w-4 h-4" />
+                <Clock className="w-3.5 h-3.5 md:w-4 md:h-4" />
                 <span>{formatTimer(secondsLeft)}</span>
               </div>
               <button
                 onClick={handleSubmitExam}
                 disabled={isSubmitting}
-                className="px-5 py-2.5 bg-emerald-600 hover:bg-emerald-700 disabled:bg-slate-300 text-white text-xs md:text-sm font-bold rounded-xl shadow-md flex items-center gap-2 cursor-pointer"
+                className="px-3.5 py-2 md:px-5 md:py-2.5 bg-emerald-600 hover:bg-emerald-700 disabled:bg-slate-300 text-white text-xs md:text-sm font-bold rounded-xl shadow-md flex items-center gap-1.5 cursor-pointer"
               >
-                <Send className="w-4 h-4" />
-                <span>{isSubmitting ? 'កំពុងបញ្ជូន...' : 'បញ្ជូនចម្លើយ (Submit)'}</span>
+                <Send className="w-3.5 h-3.5 md:w-4 md:h-4" />
+                <span>{isSubmitting ? 'កំពុងបញ្ជូន...' : 'បញ្ជូន'}</span>
               </button>
             </div>
           </div>

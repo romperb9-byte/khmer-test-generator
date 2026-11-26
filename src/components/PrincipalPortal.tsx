@@ -330,6 +330,7 @@ export const PrincipalPortal: React.FC<PrincipalPortalProps> = ({
       'អត្តលេខ',
       'ឈ្មោះសិស្ស',
       'ថ្នាក់',
+      'ប្រចាំខែ',
       'មុខវិជ្ជា',
       'វិញ្ញាសា',
       'ពិន្ទុ (លើ ១០)',
@@ -342,6 +343,7 @@ export const PrincipalPortal: React.FC<PrincipalPortalProps> = ({
       escapeCsv(s.student_id),
       escapeCsv(s.student_name),
       escapeCsv(s.grade),
+      escapeCsv(s.exam_month || '-'),
       escapeCsv(s.subject),
       escapeCsv(s.test_title),
       escapeCsv(s.score),
@@ -534,7 +536,10 @@ export const PrincipalPortal: React.FC<PrincipalPortalProps> = ({
                           </td>
                           <td className="p-4">
                             <span className="inline-block px-2 py-0.5 bg-blue-50 text-blue-700 rounded text-xs font-bold mr-1.5">{t.grade}</span>
-                            <span className="inline-block px-2 py-0.5 bg-indigo-50 text-indigo-700 rounded text-xs font-bold">{t.subject}</span>
+                            <span className="inline-block px-2 py-0.5 bg-indigo-50 text-indigo-700 rounded text-xs font-bold mr-1.5">{t.subject}</span>
+                            {t.exam_month && (
+                              <span className="inline-block px-2 py-0.5 bg-emerald-50 text-emerald-700 rounded text-xs font-bold">{t.exam_month}</span>
+                            )}
                           </td>
                           <td className="p-4 text-xs text-slate-600 font-medium">{t.teacher_name || 'គ្រូបង្រៀន'}</td>
                           <td className="p-4 text-center">
@@ -925,7 +930,9 @@ export const PrincipalPortal: React.FC<PrincipalPortalProps> = ({
                           <td className="p-4 font-bold text-slate-900">{s.student_name}</td>
                           <td className="p-4 text-xs font-semibold text-blue-700">{s.grade}</td>
                           <td className="p-4">
-                            <p className="text-xs font-bold text-indigo-700">{s.subject}</p>
+                            <p className="text-xs font-bold text-indigo-700">
+                              {s.subject} {s.exam_month ? `• ${s.exam_month}` : ''}
+                            </p>
                             <p className="text-[11px] text-slate-500">{s.test_title}</p>
                           </td>
                           <td className="p-4 text-center text-xs font-semibold text-slate-600">

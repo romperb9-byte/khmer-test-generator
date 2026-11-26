@@ -56,6 +56,7 @@ import { StudentTestPortal } from './components/StudentTestPortal.tsx';
 import { preprocessMathForDisplay } from './utils/mathUtils.ts';
 
 const GRADES = Array.from({ length: 12 }, (_, i) => `ថ្នាក់ទី ${i + 1}`);
+const EXAM_MONTHS = ['ធ្នូ', 'មករា', 'កុម្ភៈ', 'មីនា', 'ឆមាស១', 'ឧសភា', 'មិថុនា', 'កក្កដា', 'សីហា', 'ឆមាស២'];
 
 export default function App() {
   const [currentSchool, setCurrentSchool] = useState<School | null>(null);
@@ -64,6 +65,7 @@ export default function App() {
   const [newSubjectInput, setNewSubjectInput] = useState('');
 
   const [grade, setGrade] = useState(GRADES[11]);
+  const [examMonth, setExamMonth] = useState(EXAM_MONTHS[0]);
   const [subject, setSubject] = useState(DEFAULT_SUBJECTS[1]);
   const [apiKey, setApiKey] = useState(() => getStoredGeminiApiKey());
   const [showSidebarApiKey, setShowSidebarApiKey] = useState(false);
@@ -173,6 +175,7 @@ export default function App() {
         title: test.title,
         grade: test.grade,
         subject: test.subject,
+        exam_month: examMonth,
         teacher_name: teacherName.trim() || 'គ្រូបង្រៀន',
         duration: getDuration(),
         questions: test.questions,
@@ -191,10 +194,12 @@ export default function App() {
   const handleLoadSavedTest = (saved: SavedTest) => {
     setGrade(saved.grade);
     setSubject(saved.subject);
+    if (saved.exam_month) setExamMonth(saved.exam_month);
     setTest({
       title: saved.title,
       grade: saved.grade,
       subject: saved.subject,
+      exam_month: saved.exam_month,
       questions: saved.questions,
       duration: saved.duration,
     });
@@ -531,14 +536,24 @@ export default function App() {
                     </button>
                   </div>
                 )}
-                <div className="grid grid-cols-2 gap-2">
-                  <select 
-                    value={grade}
-                    onChange={(e) => setGrade(e.target.value)}
-                    className="w-full p-2.5 text-sm border border-slate-200 rounded-lg focus:ring-2 focus:ring-blue-500/10 focus:border-blue-500 bg-slate-50 outline-none transition-all appearance-none cursor-pointer"
-                  >
-                    {GRADES.map(g => <option key={g} value={g}>{g}</option>)}
-                  </select>
+                <div className="space-y-2">
+                  <div className="grid grid-cols-2 gap-2">
+                    <select 
+                      value={grade}
+                      onChange={(e) => setGrade(e.target.value)}
+                      className="w-full p-2.5 text-sm border border-slate-200 rounded-lg focus:ring-2 focus:ring-blue-500/10 focus:border-blue-500 bg-slate-50 outline-none transition-all appearance-none cursor-pointer"
+                    >
+                      {GRADES.map(g => <option key={g} value={g}>{g}</option>)}
+                    </select>
+                    <select 
+                      value={examMonth}
+                      onChange={(e) => setExamMonth(e.target.value)}
+                      title="ប្រចាំខែ / ឆមាស"
+                      className="w-full p-2.5 text-sm border border-slate-200 rounded-lg focus:ring-2 focus:ring-blue-500/10 focus:border-blue-500 bg-slate-50 outline-none transition-all appearance-none cursor-pointer"
+                    >
+                      {EXAM_MONTHS.map(m => <option key={m} value={m}>ប្រចាំខែ {m}</option>)}
+                    </select>
+                  </div>
                   <select 
                     value={subject}
                     onChange={(e) => setSubject(e.target.value)}
@@ -787,7 +802,7 @@ export default function App() {
                         <div className="flex justify-between items-start">
                            <div className="space-y-1 text-sm font-bold">
                               <p>សាលា..................................................</p>
-                              <p>ប្រឡងប្រចាំខែ........... ថ្នាក់ទី {test?.grade.replace('ថ្នាក់ទី ', '')} សម័យប្រឡង៖ .........................</p>
+                              <p>ប្រឡងប្រចាំខែ {test?.exam_month || examMonth} ថ្នាក់ទី {test?.grade.replace('ថ្នាក់ទី ', '')} សម័យប្រឡង៖ .........................</p>
                               <p className="pt-2">ហត្ថលេខាអនុរក្ស៖</p>
                               <p>១. .................................</p>
                               <p>២. .................................</p>

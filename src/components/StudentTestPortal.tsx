@@ -19,6 +19,7 @@ import { fetchTests, fetchSubjects, submitStudentTest, fetchStudents, countStude
 import { preprocessMathForDisplay } from '../utils/mathUtils';
 
 const GRADES = Array.from({ length: 12 }, (_, i) => `ថ្នាក់ទី ${i + 1}`);
+const EXAM_MONTHS = ['ធ្នូ', 'មករា', 'កុម្ភៈ', 'មីនា', 'ឆមាស១', 'ឧសភា', 'មិថុនា', 'កក្កដា', 'សីហា', 'ឆមាស២'];
 
 interface StudentTestPortalProps {
   school: School;
@@ -100,6 +101,7 @@ export const StudentTestPortal: React.FC<StudentTestPortalProps> = ({ school }) 
   const [studentId, setStudentId] = useState('');
   const [studentName, setStudentName] = useState('');
   const [selectedSchoolName, setSelectedSchoolName] = useState(school.name);
+  const [examMonth, setExamMonth] = useState('');
   const [subject, setSubject] = useState('');
 
   const [subjects, setSubjects] = useState<string[]>([]);
@@ -148,7 +150,10 @@ export const StudentTestPortal: React.FC<StudentTestPortalProps> = ({ school }) 
   }, [step, secondsLeft]);
 
   const matchingTests = publishedTests.filter(
-    t => t.grade === grade && (!subject || t.subject === subject)
+    t =>
+      t.grade === grade &&
+      (!subject || t.subject === subject) &&
+      (!examMonth || t.exam_month === examMonth)
   );
 
   const handleStartTest = async (test: SavedTest) => {
@@ -194,6 +199,7 @@ export const StudentTestPortal: React.FC<StudentTestPortalProps> = ({ school }) 
         test_title: activeTest.title,
         grade,
         subject: activeTest.subject,
+        exam_month: activeTest.exam_month || examMonth || '',
         student_id: studentId.trim(),
         student_name: studentName.trim(),
         answers,
@@ -623,7 +629,19 @@ export const StudentTestPortal: React.FC<StudentTestPortalProps> = ({ school }) 
               />
             </div>
 
-            <div className="sm:col-span-2">
+            <div>
+              <label className="block text-xs font-bold text-slate-700 mb-1.5">ជ្រើសរើសប្រចាំខែ / ឆមាស</label>
+              <select
+                value={examMonth}
+                onChange={(e) => setExamMonth(e.target.value)}
+                className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm font-semibold focus:outline-none focus:border-blue-500"
+              >
+                <option value="">គ្រប់ខែ / ឆមាស</option>
+                {EXAM_MONTHS.map(m => <option key={m} value={m}>{m}</option>)}
+              </select>
+            </div>
+
+            <div>
               <label className="block text-xs font-bold text-slate-700 mb-1.5">សាលា</label>
               <input
                 type="text"

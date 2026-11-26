@@ -45,6 +45,7 @@ export interface GeneratedTest {
   title: string;
   grade: string;
   subject: string;
+  exam_month?: string;
   questions: Question[];
   duration?: number;
 }
@@ -85,6 +86,7 @@ export interface StudentSubmission {
   test_title: string;
   grade: string;
   subject: string;
+  exam_month?: string;
   student_id: string;
   student_name: string;
   answers: Record<string, string | Record<number, string>>;

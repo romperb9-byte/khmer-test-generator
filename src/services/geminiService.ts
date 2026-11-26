@@ -255,11 +255,11 @@ export async function generateTest(options: TestGeneratorOptions): Promise<Gener
     2. Variety: strictly follow the question types requested.
     3. Math Formatting: Use LaTeX for mathematical expressions to ensure they are high-quality. 
        - Fractions: \frac{a}{b} (DO NOT wrap fractions in parentheses like (\frac{a}{b}), just use \frac{a}{b})
-       - Numbers: DO NOT wrap single numbers or simple expressions in parentheses unless required by math rules.
+       - Numbers: DO NOT wrap plain numbers, integers, decimals, or simple percentages (like 5, 12, 3.5, 20%) in $...$! Write plain numbers directly without dollar signs.
        - Exponents: x^{2}
        - Degrees: 90^{\circ}
        - Roots: \sqrt{x}
-       Always wrap LaTeX in single dollar signs for inline ($...$) or dollar signs ($$...$$).
+       Only wrap complex LaTeX formulas/expressions in $...$ (never put spaces right after opening $ or right before closing $).
     4. For Grade 1-3 Math/Science:
        - If the question involves visual concepts (fractions, geometry, living things), GENERATE a simple SVG diagram in the 'svg' field.
        - SVG rules: Use viewBox="0 0 200 200", width="100%", height="auto". Keep it simple with strokes and fill.

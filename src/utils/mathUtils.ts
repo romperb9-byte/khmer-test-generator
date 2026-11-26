@@ -69,5 +69,35 @@ export function preprocessMathForDisplay(text: string): string {
   // 7. Simplify extra dollars or double wrappers if they occur
   processed = processed.replace(/\$\$\$\$/g, '$$');
 
+  // 8. Remove unnecessary $...$ around plain numbers, simple variables, or simple percentages (e.g. $5$, $ 12.5 $, $20\%$)
+  processed = processed.replace(/\$\s*([+-]?\d+(?:[.,]\d+)?(?:\s*\\%|\s*%)?)\s*\$/g, (_, num) => num.replace(/\\%/g, '%'));
+
+  // 9. Trim spaces inside single $ ... $ so remark-math always parses it cleanly instead of showing literal $
+  processed = processed.replace(/(?<!\$)\$\s+([^$\n]+?)\s*\$(?!\$)/g, (_, inner) => `$${inner.trim()}$`);
+  processed = processed.replace(/(?<!\$)\$([^$\n]+?)\s+\$(?!\$)/g, (_, inner) => `$${inner.trim()}$`);
+
   return processed;
+}
+
+/**
+ * Strips LaTeX dollar wrappers for plain-text contexts (e.g. <option> tags, tables)
+ * while keeping readable math symbols.
+ */
+export function stripMathDollars(text: string): string {
+  if (!text) return '';
+  return text
+    .replace(/\$\$/g, '')
+    .replace(/\$/g, '')
+    .replace(/\\times/g, '×')
+    .replace(/\\div/g, '÷')
+    .replace(/\\cdot/g, '·')
+    .replace(/\\le/g, '≤')
+    .replace(/\\ge/g, '≥')
+    .replace(/\\neq/g, '≠')
+    .replace(/\\approx/g, '≈')
+    .replace(/\\circ/g, '°')
+    .replace(/\\frac\{([^}]*)\}\{([^}]*)\}/g, '$1/$2')
+    .replace(/\\sqrt\{([^}]*)\}/g, '√($1)')
+    .replace(/\\([a-zA-Z]+)/g, '$1')
+    .trim();
 }

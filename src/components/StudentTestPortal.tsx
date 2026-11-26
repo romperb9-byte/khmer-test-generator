@@ -16,7 +16,7 @@ import {
 } from 'lucide-react';
 import { School, SavedTest, Question, QuestionType, StudentSubmission, StudentRecord } from '../types';
 import { fetchTests, fetchSubjects, submitStudentTest, fetchStudents, countStudentAttempts } from '../services/dbService';
-import { preprocessMathForDisplay } from '../utils/mathUtils';
+import { preprocessMathForDisplay, stripMathDollars } from '../utils/mathUtils';
 
 const GRADES = Array.from({ length: 12 }, (_, i) => `ថ្នាក់ទី ${i + 1}`);
 const EXAM_MONTHS = ['ធ្នូ', 'មករា', 'កុម្ភៈ', 'មីនា', 'ឆមាស១', 'ឧសភា', 'មិថុនា', 'កក្កដា', 'សីហា', 'ឆមាស២'];
@@ -423,7 +423,11 @@ export const StudentTestPortal: React.FC<StudentTestPortalProps> = ({ school, on
                               }`}>
                                 {letter}
                               </span>
-                              <span className="text-sm font-medium">{opt}</span>
+                              <div className="text-sm font-medium markdown-body">
+                                <ReactMarkdown remarkPlugins={[remarkMath]} rehypePlugins={[rehypeKatex]}>
+                                  {preprocessMathForDisplay(opt)}
+                                </ReactMarkdown>
+                              </div>
                             </button>
                           );
                         })}
@@ -451,8 +455,10 @@ export const StudentTestPortal: React.FC<StudentTestPortalProps> = ({ school, on
                       const currentMap = (typeof currentVal === 'object' && currentVal !== null ? currentVal : {}) as Record<number, string>;
                       return q.matchingPairs.map((pair, pIdx) => (
                         <div key={pIdx} className="flex flex-col sm:flex-row sm:items-center gap-3 p-3 bg-slate-50 rounded-xl border border-slate-200">
-                          <div className="flex-1 text-sm font-bold text-slate-800">
-                            {pIdx + 1}. {pair.left}
+                          <div className="flex-1 text-sm font-bold text-slate-800 markdown-body">
+                            <ReactMarkdown remarkPlugins={[remarkMath]} rehypePlugins={[rehypeKatex]}>
+                              {`${pIdx + 1}. ${preprocessMathForDisplay(pair.left)}`}
+                            </ReactMarkdown>
                           </div>
                           <select
                             value={currentMap[pIdx] || ''}
@@ -469,7 +475,7 @@ export const StudentTestPortal: React.FC<StudentTestPortalProps> = ({ school, on
                               const letter = String.fromCharCode(65 + rIdx);
                               return (
                                 <option key={rIdx} value={letter}>
-                                  {letter}. {r.right}
+                                  {letter}. {stripMathDollars(r.right)}
                                 </option>
                               );
                             })}

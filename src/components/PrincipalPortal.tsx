@@ -307,6 +307,11 @@ export const PrincipalPortal: React.FC<PrincipalPortalProps> = ({
     setTests(prev => prev.map(t => (t.id === testId ? updated : t)));
   };
 
+  const handleChangeDuration = async (testId: string, duration: number) => {
+    const updated = await updateTestSettings(testId, { duration });
+    setTests(prev => prev.map(t => (t.id === testId ? updated : t)));
+  };
+
   const filteredTests = tests.filter(t => {
     const gOk = testGradeFilter === 'ទាំងអស់' || t.grade === testGradeFilter;
     const sOk = testSubjectFilter === 'ទាំងអស់' || t.subject === testSubjectFilter;
@@ -524,6 +529,7 @@ export const PrincipalPortal: React.FC<PrincipalPortalProps> = ({
                         <th className="p-4 text-center">បើកឱ្យសិស្សប្រឡង</th>
                         <th className="p-4 text-center">ឃើញពិន្ទុភ្លាមៗ</th>
                         <th className="p-4 text-center">ចំនួនដងប្រឡង</th>
+                        <th className="p-4 text-center">រយៈពេល</th>
                         <th className="p-4 text-right">សកម្មភាព</th>
                       </tr>
                     </thead>
@@ -579,6 +585,19 @@ export const PrincipalPortal: React.FC<PrincipalPortalProps> = ({
                               <option value={2}>២ ដង</option>
                               <option value={3}>៣ ដង</option>
                               <option value={5}>៥ ដង</option>
+                            </select>
+                          </td>
+                          <td className="p-4 text-center">
+                            <select
+                              value={t.duration ?? 60}
+                              onChange={(e) => handleChangeDuration(t.id, Number(e.target.value))}
+                              className="px-2.5 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-xs font-bold text-slate-700"
+                            >
+                              {Array.from(new Set([10, 15, 20, 30, 40, 45, 50, 60, 90, 120, t.duration ?? 60]))
+                                .sort((a, b) => a - b)
+                                .map(mins => (
+                                  <option key={mins} value={mins}>{mins} នាទី</option>
+                                ))}
                             </select>
                           </td>
                           <td className="p-4 text-right space-x-1">

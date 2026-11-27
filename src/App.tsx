@@ -38,7 +38,8 @@ import {
   KeyRound,
   CheckCircle2,
   Eye,
-  EyeOff
+  EyeOff,
+  Edit3
 } from 'lucide-react';
 import { Difficulty, QuestionType, TestGeneratorOptions, GeneratedTest, Question, School, SavedTest } from './types.ts';
 import { generateTest, getStoredGeminiApiKey, setStoredGeminiApiKey } from './services/geminiService.ts';
@@ -72,6 +73,7 @@ export default function App() {
   const [teacherName, setTeacherName] = useState('គ្រូបង្រៀន');
   const [isSavingTest, setIsSavingTest] = useState(false);
   const [saveSuccessMsg, setSaveSuccessMsg] = useState<string | null>(null);
+  const [isEditingTest, setIsEditingTest] = useState(false);
 
   const [material, setMaterial] = useState('');
   const [images, setImages] = useState<string[]>([]);
@@ -192,7 +194,7 @@ export default function App() {
         subject: test.subject,
         exam_month: examMonth,
         teacher_name: teacherName.trim() || 'គ្រូបង្រៀន',
-        duration: getDuration(),
+        duration: test.duration || getDuration(),
         questions: test.questions,
         is_published: false,
         show_score_immediately: true,
@@ -819,6 +821,17 @@ export default function App() {
                           </div>
                           <div className="flex flex-wrap gap-2 w-full md:w-auto shrink-0">
                             <button
+                              onClick={() => setIsEditingTest(!isEditingTest)}
+                              className={`flex-1 md:flex-initial flex items-center justify-center gap-2 px-4 py-2.5 font-bold text-xs rounded-xl shadow-md transition-all active:scale-95 cursor-pointer ${
+                                isEditingTest
+                                  ? 'bg-amber-500 hover:bg-amber-600 text-white shadow-amber-500/20'
+                                  : 'bg-white hover:bg-slate-50 text-slate-800 border border-slate-300'
+                              }`}
+                            >
+                              <Edit3 className="w-4 h-4" />
+                              <span>{isEditingTest ? 'រក្សាទុកការកែប្រែ' : 'កែប្រែវិញ្ញាសា'}</span>
+                            </button>
+                            <button
                               onClick={handleSaveTestToApp}
                               disabled={isSavingTest}
                               className="flex-1 md:flex-initial flex items-center justify-center gap-2 px-4 py-2.5 bg-emerald-600 hover:bg-emerald-700 disabled:bg-slate-300 text-white font-bold text-xs rounded-xl shadow-md shadow-emerald-500/20 transition-all active:scale-95 cursor-pointer"
@@ -838,6 +851,194 @@ export default function App() {
                       </div>
                     )}
                     
+                    {isEditingTest && test ? (
+                      <div className="space-y-6 pb-20">
+                        <div className="bg-amber-50/70 border border-amber-200 rounded-2xl p-5 space-y-4">
+                          <div className="flex items-center justify-between">
+                            <h3 className="font-extrabold text-amber-900 text-base flex items-center gap-2">
+                              <Edit3 className="w-5 h-5" /> កែប្រែព័ត៌មានទូទៅ និងសំណួរ
+                            </h3>
+                            <button
+                              onClick={() => setIsEditingTest(false)}
+                              className="px-4 py-2 bg-amber-600 hover:bg-amber-700 text-white text-xs font-bold rounded-xl cursor-pointer"
+                            >
+                              រក្សាទុកការកែប្រែ
+                            </button>
+                          </div>
+                          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                            <div className="sm:col-span-2">
+                              <label className="block text-xs font-bold text-slate-700 mb-1">ចំណងជើងវិញ្ញាសា</label>
+                              <input
+                                type="text"
+                                value={test.title}
+                                onChange={(e) => setTest({ ...test, title: e.target.value })}
+                                className="w-full px-3.5 py-2 bg-white border border-slate-200 rounded-xl text-sm font-bold"
+                              />
+                            </div>
+                            <div>
+                              <label className="block text-xs font-bold text-slate-700 mb-1">រយៈពេល (នាទី)</label>
+                              <input
+                                type="number"
+                                min={5}
+                                max={300}
+                                value={test.duration ?? getDuration()}
+                                onChange={(e) => setTest({ ...test, duration: Number(e.target.value) || 60 })}
+                                className="w-full px-3.5 py-2 bg-white border border-slate-200 rounded-xl text-sm font-bold"
+                              />
+                            </div>
+                          </div>
+                        </div>
+
+                        {test.questions.map((q, qIdx) => {
+                          const updateQuestion = (patch: Partial<Question>) => {
+                            const updated = test.questions.map((item, i) =>
+                              i === qIdx ? { ...item, ...patch } : item
+                            );
+                            setTest({ ...test, questions: updated });
+                          };
+
+                          return (
+                            <div key={q.id} className="bg-slate-50 border border-slate-200 rounded-2xl p-5 space-y-4">
+                              <div className="flex items-center justify-between gap-2">
+                                <span className="px-3 py-1 bg-blue-100 text-blue-800 rounded-lg text-xs font-extrabold">
+                                  សំណួរទី {qIdx + 1} • {q.type}
+                                </span>
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    const filtered = test.questions.filter((_, i) => i !== qIdx);
+                                    setTest({ ...test, questions: filtered });
+                                  }}
+                                  className="p-1.5 hover:bg-rose-100 text-rose-600 rounded-lg cursor-pointer"
+                                  title="លុបសំណួរនេះ"
+                                >
+                                  <Trash2 className="w-4 h-4" />
+                                </button>
+                              </div>
+
+                              <div>
+                                <label className="block text-xs font-bold text-slate-600 mb-1">ប្រធានសំណួរ</label>
+                                <textarea
+                                  rows={2}
+                                  value={q.question}
+                                  onChange={(e) => updateQuestion({ question: e.target.value })}
+                                  className="w-full px-3.5 py-2 bg-white border border-slate-200 rounded-xl text-sm"
+                                />
+                              </div>
+
+                              {q.options && q.options.length > 0 && (
+                                <div className="space-y-2">
+                                  <label className="block text-xs font-bold text-slate-600">ជម្រើសចម្លើយ</label>
+                                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                                    {q.options.map((opt, oIdx) => (
+                                      <div key={oIdx} className="flex items-center gap-2">
+                                        <span className="w-6 h-6 rounded-full bg-slate-200 text-slate-700 text-xs font-bold flex items-center justify-center shrink-0">
+                                          {String.fromCharCode(65 + oIdx)}
+                                        </span>
+                                        <input
+                                          type="text"
+                                          value={opt}
+                                          onChange={(e) => {
+                                            const nextOpts = [...q.options!];
+                                            nextOpts[oIdx] = e.target.value;
+                                            updateQuestion({ options: nextOpts });
+                                          }}
+                                          className="flex-1 px-3 py-1.5 bg-white border border-slate-200 rounded-lg text-xs"
+                                        />
+                                      </div>
+                                    ))}
+                                  </div>
+                                </div>
+                              )}
+
+                              {q.matchingPairs && q.matchingPairs.length > 0 && (
+                                <div className="space-y-2">
+                                  <label className="block text-xs font-bold text-slate-600">គូផ្គូរផ្គង (ក ↔ ខ)</label>
+                                  {q.matchingPairs.map((pair, pIdx) => (
+                                    <div key={pIdx} className="grid grid-cols-2 gap-2">
+                                      <input
+                                        type="text"
+                                        value={pair.left}
+                                        onChange={(e) => {
+                                          const nextPairs = [...q.matchingPairs!];
+                                          nextPairs[pIdx] = { ...nextPairs[pIdx], left: e.target.value };
+                                          updateQuestion({ matchingPairs: nextPairs });
+                                        }}
+                                        className="px-3 py-1.5 bg-white border border-slate-200 rounded-lg text-xs"
+                                      />
+                                      <input
+                                        type="text"
+                                        value={pair.right}
+                                        onChange={(e) => {
+                                          const nextPairs = [...q.matchingPairs!];
+                                          nextPairs[pIdx] = { ...nextPairs[pIdx], right: e.target.value };
+                                          updateQuestion({ matchingPairs: nextPairs });
+                                        }}
+                                        className="px-3 py-1.5 bg-white border border-slate-200 rounded-lg text-xs"
+                                      />
+                                    </div>
+                                  ))}
+                                </div>
+                              )}
+
+                              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                                <div>
+                                  <label className="block text-xs font-bold text-slate-600 mb-1">ចម្លើយត្រឹមត្រូវ</label>
+                                  <input
+                                    type="text"
+                                    value={typeof q.answer === 'string' ? q.answer : JSON.stringify(q.answer)}
+                                    onChange={(e) => updateQuestion({ answer: e.target.value })}
+                                    className="w-full px-3 py-1.5 bg-emerald-50 border border-emerald-200 rounded-lg text-xs font-bold text-emerald-800"
+                                  />
+                                </div>
+                                <div>
+                                  <label className="block text-xs font-bold text-slate-600 mb-1">ការពន្យល់ (បើមាន)</label>
+                                  <input
+                                    type="text"
+                                    value={q.explanation || ''}
+                                    onChange={(e) => updateQuestion({ explanation: e.target.value })}
+                                    className="w-full px-3 py-1.5 bg-white border border-slate-200 rounded-lg text-xs"
+                                  />
+                                </div>
+                              </div>
+
+                              {(q.type === QuestionType.SHORT_ANSWER || q.type === QuestionType.LONG_ANSWER) && (
+                                <label className="inline-flex items-center gap-2 text-xs font-bold text-slate-700 cursor-pointer">
+                                  <input
+                                    type="checkbox"
+                                    checked={!!q.allowImageUpload}
+                                    onChange={(e) => updateQuestion({ allowImageUpload: e.target.checked })}
+                                    className="w-4 h-4 text-emerald-600 rounded"
+                                  />
+                                  <span>អនុញ្ញាតឱ្យសិស្ស Upload រូបភាពចម្លើយ (.jpg)</span>
+                                </label>
+                              )}
+                            </div>
+                          );
+                        })}
+
+                        <div className="flex flex-wrap gap-3 justify-end pt-2">
+                          <button
+                            type="button"
+                            onClick={() => setIsEditingTest(false)}
+                            className="px-5 py-2.5 bg-amber-500 hover:bg-amber-600 text-white text-xs font-bold rounded-xl shadow cursor-pointer"
+                          >
+                            រក្សាទុកការកែប្រែ
+                          </button>
+                          <button
+                            type="button"
+                            onClick={async () => {
+                              setIsEditingTest(false);
+                              await handleSaveTestToApp();
+                            }}
+                            className="px-5 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-xl shadow cursor-pointer"
+                          >
+                            រក្សាទុកការកែប្រែ & បញ្ជូនចូលឃ្លាំង
+                          </button>
+                        </div>
+                      </div>
+                    ) : (
+                    <>
                     {/* Kid/Discovery Friendly Decorations */}
                     {isYoungGrade() && (
                       <div className="absolute top-0 left-0 right-0 h-40 pointer-events-none opacity-10 flex justify-between px-10 print:hidden">
@@ -896,6 +1097,8 @@ export default function App() {
                         <QuestionCard key={q.id} question={q} index={idx} isYoung={isYoungGrade()} isIntermediate={isIntermediateGrade()} />
                       ))}
                     </div>
+                    </>
+                    )}
                   </motion.div>
                 )}
               </AnimatePresence>

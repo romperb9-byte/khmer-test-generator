@@ -97,6 +97,10 @@ export const PrincipalPortal: React.FC<PrincipalPortalProps> = ({
   const [googleSyncMsg, setGoogleSyncMsg] = useState<string | null>(null);
   const [googleSyncErr, setGoogleSyncErr] = useState<string | null>(null);
   const [copiedScript, setCopiedScript] = useState(false);
+  const [googleUnlocked, setGoogleUnlocked] = useState(false);
+  const [googlePasscode, setGooglePasscode] = useState('');
+  const [showGooglePasscode, setShowGooglePasscode] = useState(false);
+  const [googlePassError, setGooglePassError] = useState<string | null>(null);
 
   // Access Codes state
   const [teacherCode, setTeacherCode] = useState(school.teacher_code || '1111');
@@ -748,6 +752,60 @@ export const PrincipalPortal: React.FC<PrincipalPortalProps> = ({
 
         {/* TAB GOOGLE SHEET & DRIVE */}
         {activeTab === 'google' && (
+          !googleUnlocked ? (
+            <div className="bg-white rounded-2xl border border-slate-200 p-8 shadow-sm max-w-md mx-auto space-y-5">
+              <div className="text-center space-y-2">
+                <div className="w-12 h-12 bg-emerald-100 text-emerald-600 rounded-2xl flex items-center justify-center mx-auto">
+                  <Lock className="w-6 h-6" />
+                </div>
+                <h3 className="font-extrabold text-slate-900 text-base">បញ្ចូលលេខកូដសម្ងាត់</h3>
+                <p className="text-xs text-slate-500">
+                  ត្រូវការលេខកូដដើម្បីបើក និងកែប្រែការភ្ជាប់ Google Sheet & Drive
+                </p>
+              </div>
+              <form
+                onSubmit={(e) => {
+                  e.preventDefault();
+                  if (googlePasscode.trim() === '555') {
+                    setGoogleUnlocked(true);
+                    setGooglePassError(null);
+                    setGooglePasscode('');
+                  } else {
+                    setGooglePassError('លេខកូដមិនត្រឹមត្រូវទេ!');
+                  }
+                }}
+                className="space-y-4"
+              >
+                <div className="relative">
+                  <Lock className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
+                  <input
+                    type={showGooglePasscode ? 'text' : 'password'}
+                    autoFocus
+                    value={googlePasscode}
+                    onChange={(e) => { setGooglePasscode(e.target.value); setGooglePassError(null); }}
+                    placeholder="បញ្ចូលលេខកូដ..."
+                    className="w-full pl-10 pr-10 py-2.5 border border-slate-200 rounded-xl text-sm focus:outline-none focus:border-emerald-500"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowGooglePasscode(!showGooglePasscode)}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 cursor-pointer"
+                  >
+                    {showGooglePasscode ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                  </button>
+                </div>
+                {googlePassError && (
+                  <p className="text-xs text-rose-600 font-semibold">{googlePassError}</p>
+                )}
+                <button
+                  type="submit"
+                  className="w-full py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-xl shadow-sm cursor-pointer"
+                >
+                  បើកផ្ទាំង Google Sheet & Drive
+                </button>
+              </form>
+            </div>
+          ) : (
           <div className="space-y-6 max-w-4xl">
             <div className="bg-white rounded-2xl border border-slate-200 p-6 shadow-sm space-y-5">
               <div>
@@ -830,6 +888,7 @@ export const PrincipalPortal: React.FC<PrincipalPortalProps> = ({
               </pre>
             </div>
           </div>
+          )
         )}
 
         {/* TAB STUDENTS ROSTER */}

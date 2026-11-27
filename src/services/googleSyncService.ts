@@ -86,26 +86,48 @@ export const GOOGLE_APPS_SCRIPT_CODE = `function doPost(e) {
   }
 }`;
 
+function validateWebhookUrl(url: string): string {
+  const clean = url.trim();
+  if (!clean.startsWith('https://script.google.com/')) {
+    throw new Error('URL មិនត្រឹមត្រូវទេ! ត្រូវចាប់ផ្ដើមដោយ https://script.google.com/macros/s/.../exec');
+  }
+  if (clean.endsWith('/dev')) {
+    throw new Error('សូមកុំប្រើតំណ /dev ។ សូមប្រើតំណ Web App URL ដែលបញ្ចប់ដោយ /exec ពីការ Deploy!');
+  }
+  return clean;
+}
+
 export async function uploadImageToGoogleDrive(
   webhookUrl: string,
   base64DataUrl: string,
   fileName: string
 ): Promise<{ imageUrl: string; viewUrl: string }> {
-  const res = await fetch(webhookUrl.trim(), {
-    method: 'POST',
-    headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-    body: JSON.stringify({
-      action: 'uploadImage',
-      base64: base64DataUrl,
-      mimeType: 'image/jpeg',
-      fileName,
-    }),
-  });
-  const json = await res.json();
-  if (!json?.ok || !json?.imageUrl) {
-    throw new Error(json?.error || 'មិនអាចផ្ទុករូបភាពទៅ Google Drive បានទេ');
+  const cleanUrl = validateWebhookUrl(webhookUrl);
+  try {
+    const res = await fetch(cleanUrl, {
+      method: 'POST',
+      redirect: 'follow',
+      headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+      body: JSON.stringify({
+        action: 'uploadImage',
+        base64: base64DataUrl,
+        mimeType: 'image/jpeg',
+        fileName,
+      }),
+    });
+    const json = await res.json();
+    if (!json?.ok || !json?.imageUrl) {
+      throw new Error(json?.error || 'មិនអាចផ្ទុករូបភាពទៅ Google Drive បានទេ');
+    }
+    return { imageUrl: json.imageUrl, viewUrl: json.viewUrl || json.imageUrl };
+  } catch (err: any) {
+    if (String(err?.message || '').includes('Failed to fetch')) {
+      throw new Error(
+        'មិនអាចភ្ជាប់ទៅ Google Drive បានទេ (Failed to fetch)។ សូមពិនិត្យក្នុង Google Apps Script → Deploy ថា "Who has access" បានដាក់ជា "Anyone" ហើយឬនៅ!'
+      );
+    }
+    throw err;
   }
-  return { imageUrl: json.imageUrl, viewUrl: json.viewUrl || json.imageUrl };
 }
 
 export async function appendSubmissionToGoogleSheet(
@@ -113,15 +135,27 @@ export async function appendSubmissionToGoogleSheet(
   submission: StudentSubmission,
   imageLinks: string[]
 ): Promise<void> {
-  await fetch(webhookUrl.trim(), {
-    method: 'POST',
-    headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-    body: JSON.stringify({
-      action: 'appendSubmission',
-      submission,
-      imageLinks,
-    }),
+  const cleanUrl = validateWebhookUrl(webhookUrl);
+  const payload = JSON.stringify({
+    action: 'appendSubmission',
+    submission,
+    imageLinks,
   });
+  try {
+    await fetch(cleanUrl, {
+      method: 'POST',
+      redirect: 'follow',
+      headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+      body: payload,
+    });
+  } catch {
+    await fetch(cleanUrl, {
+      method: 'POST',
+      mode: 'no-cors',
+      headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+      body: payload,
+    });
+  }
 }
 
 export async function syncAllToGoogleSheet(
@@ -132,16 +166,34 @@ export async function syncAllToGoogleSheet(
     tests: SavedTest[];
   }
 ): Promise<void> {
-  const res = await fetch(webhookUrl.trim(), {
-    method: 'POST',
-    headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-    body: JSON.stringify({
-      action: 'syncAll',
-      ...payload,
-    }),
+  const cleanUrl = validateWebhookUrl(webhookUrl);
+  const body = JSON.stringify({
+    action: 'syncAll',
+    ...payload,
   });
-  const json = await res.json();
-  if (!json?.ok) {
-    throw new Error(json?.error || 'មិនអាចបញ្ជូនទិន្នន័យទៅ Google Sheet បានទេ');
+
+  try {
+    const res = await fetch(cleanUrl, {
+      method: 'POST',
+      redirect: 'follow',
+      headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+      body,
+    });
+    const json = await res.json();
+    if (!json?.ok) {
+      throw new Error(json?.error || 'មិនអាចបញ្ជូនទិន្នន័យទៅ Google Sheet បានទេ');
+    }
+  } catch (err: any) {
+    if (String(err?.message || '').includes('Failed to fetch')) {
+      // Fallback to no-cors so Google Sheet still receives the POST even if CORS redirect header is blocked
+      await fetch(cleanUrl, {
+        method: 'POST',
+        mode: 'no-cors',
+        headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+        body,
+      });
+      return;
+    }
+    throw err;
   }
 }

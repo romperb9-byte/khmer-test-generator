@@ -53,10 +53,11 @@ async function discoverCandidateModels(apiKey: string): Promise<string[]> {
         Array.isArray(m.supportedGenerationMethods) &&
         m.supportedGenerationMethods.includes('generateContent') &&
         typeof m.name === 'string' &&
-        m.name.toLowerCase().includes('flash') &&
+        (m.name.toLowerCase().includes('flash') || m.name.toLowerCase().includes('pro')) &&
         !m.name.toLowerCase().includes('audio') &&
         !m.name.toLowerCase().includes('image') &&
-        !m.name.toLowerCase().includes('tts')
+        !m.name.toLowerCase().includes('tts') &&
+        !m.name.toLowerCase().includes('embedding')
       )
       .map((m: any) => m.name.replace(/^models\//, ''));
 
@@ -64,8 +65,9 @@ async function discoverCandidateModels(apiKey: string): Promise<string[]> {
       if (n.includes('3.8-flash') && !n.includes('lite')) return 1;
       if (n.includes('3-flash') && !n.includes('lite')) return 2;
       if (n === 'gemini-flash-latest') return 3;
-      if (!n.includes('lite')) return 4;
-      return 5;
+      if (n.includes('flash') && !n.includes('lite')) return 4;
+      if (n.includes('flash-lite')) return 5;
+      return 6;
     };
 
     return Array.from(new Set(candidates)).sort((a, b) => priorityScore(a) - priorityScore(b));
@@ -113,7 +115,7 @@ async function generateWithAutoFlashModel(
 
     if (isRetryable) {
       const discovered = await discoverCandidateModels(apiKey);
-      const fallbacks = discovered.filter(m => m !== primaryModel).slice(0, 4);
+      const fallbacks = discovered.filter(m => m !== primaryModel).slice(0, 6);
 
       for (const model of fallbacks) {
         try {
@@ -124,9 +126,15 @@ async function generateWithAutoFlashModel(
       }
 
       // Final retry on primary after short pause if 503
-      if (msg.includes('503') || msg.includes('UNAVAILABLE')) {
-        await new Promise(r => setTimeout(r, 2000));
-        return await tryModel(primaryModel);
+      if (msg.includes('503') || msg.includes('UNAVAILABLE') || msg.includes('high demand')) {
+        await new Promise(r => setTimeout(r, 3000));
+        try {
+          return await tryModel(primaryModel);
+        } catch {
+          throw new Error(
+            'ម៉ាស៊ីនបម្រើ Google Gemini AI កំពុងមានអ្នកប្រើប្រាស់ច្រើនពេក (503 High Demand)។ សូមរង់ចាំ ១០-២០ វិនាទី រួចចុចបង្កើតម្ដងទៀត!'
+          );
+        }
       }
     }
     throw primaryErr;

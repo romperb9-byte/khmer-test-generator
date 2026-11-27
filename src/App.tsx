@@ -83,6 +83,16 @@ export default function App() {
     [QuestionType.SHORT_ANSWER]: 2,
     [QuestionType.LONG_ANSWER]: 2,
   });
+  const [optionCounts, setOptionCounts] = useState<{ [key in QuestionType]?: number }>({
+    [QuestionType.TRUE_FALSE]: 2,
+    [QuestionType.MATCHING]: 5,
+    [QuestionType.MULTIPLE_CHOICE]: 4,
+    [QuestionType.FILL_BLANKS]: 4,
+  });
+  const [allowImageUpload, setAllowImageUpload] = useState<{ [key in QuestionType]?: boolean }>({
+    [QuestionType.SHORT_ANSWER]: false,
+    [QuestionType.LONG_ANSWER]: false,
+  });
   const [isGenerating, setIsGenerating] = useState(false);
   const [showGoogleFormModal, setShowGoogleFormModal] = useState(false);
   const [googleFormExport, setGoogleFormExport] = useState<{ gsCode: string; htmlCode: string; googleFormCode: string } | null>(null);
@@ -261,6 +271,8 @@ export default function App() {
         material,
         images,
         questionCounts,
+        optionCounts,
+        allowImageUpload,
         difficultyDistribution: {
           [Difficulty.EASY]: 20,
           [Difficulty.MEDIUM]: 60,
@@ -606,7 +618,10 @@ export default function App() {
               </div>
 
               <div>
-                <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-3">ប្រភេទសំណួរ</label>
+                <div className="flex items-center justify-between mb-3">
+                  <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-widest">ប្រភេទសំណួរ</label>
+                  <span className="text-[9px] font-bold text-slate-400">សំណួរ | ជម្រើស/JPG</span>
+                </div>
                 <div className="space-y-2">
                   {[
                     QuestionType.TRUE_FALSE,
@@ -615,29 +630,66 @@ export default function App() {
                     QuestionType.FILL_BLANKS,
                     QuestionType.SHORT_ANSWER,
                     QuestionType.LONG_ANSWER
-                  ].map(type => (
-                    <div key={type} className={`flex items-center justify-between p-2 rounded-lg border transition-all ${questionCounts[type] ? 'border-blue-200 bg-blue-50/30' : 'border-slate-100 bg-slate-50/50'}`}>
-                      <label className="flex items-center gap-3 cursor-pointer group flex-1">
-                        <input 
-                          type="checkbox" 
-                          checked={!!questionCounts[type]}
-                          onChange={() => toggleQuestionType(type)}
-                          className="w-4 h-4 text-blue-600 rounded border-slate-300 focus:ring-blue-500"
-                        />
-                        <span className={`text-sm font-medium ${questionCounts[type] ? 'text-blue-900' : 'text-slate-600'}`}>{type}</span>
-                      </label>
-                      {questionCounts[type] !== undefined && (
-                        <input 
-                          type="number"
-                          value={questionCounts[type]}
-                          onChange={(e) => updateCount(type, parseInt(e.target.value) || 0)}
-                          className="w-10 text-center text-xs font-bold bg-white border border-blue-200 rounded py-0.5"
-                          min="1"
-                          max="20"
-                        />
-                      )}
-                    </div>
-                  ))}
+                  ].map(type => {
+                    const isWritten = type === QuestionType.SHORT_ANSWER || type === QuestionType.LONG_ANSWER;
+                    return (
+                      <div key={type} className={`flex items-center justify-between gap-2 p-2 rounded-lg border transition-all ${questionCounts[type] ? 'border-blue-200 bg-blue-50/30' : 'border-slate-100 bg-slate-50/50'}`}>
+                        <label className="flex items-center gap-2.5 cursor-pointer group flex-1 min-w-0">
+                          <input 
+                            type="checkbox" 
+                            checked={!!questionCounts[type]}
+                            onChange={() => toggleQuestionType(type)}
+                            className="w-4 h-4 text-blue-600 rounded border-slate-300 focus:ring-blue-500 shrink-0"
+                          />
+                          <span className={`text-xs font-medium truncate ${questionCounts[type] ? 'text-blue-900' : 'text-slate-600'}`}>{type}</span>
+                        </label>
+                        {questionCounts[type] !== undefined && (
+                          <div className="flex items-center gap-1.5 shrink-0">
+                            <input 
+                              type="number"
+                              value={questionCounts[type]}
+                              onChange={(e) => updateCount(type, parseInt(e.target.value) || 0)}
+                              title="ចំនួនសំណួរ"
+                              className="w-10 text-center text-xs font-bold bg-white border border-blue-200 rounded py-0.5"
+                              min="1"
+                              max="20"
+                            />
+                            {isWritten ? (
+                              <label
+                                className="flex items-center gap-1 px-1.5 py-0.5 bg-white border border-slate-200 rounded text-[10px] font-bold text-slate-600 cursor-pointer"
+                                title="អនុញ្ញាតឱ្យសិស្ស Upload រូបភាព JPG"
+                              >
+                                <input
+                                  type="checkbox"
+                                  checked={!!allowImageUpload[type]}
+                                  onChange={(e) =>
+                                    setAllowImageUpload(prev => ({ ...prev, [type]: e.target.checked }))
+                                  }
+                                  className="w-3 h-3 text-emerald-600 rounded"
+                                />
+                                <span>JPG</span>
+                              </label>
+                            ) : (
+                              <input
+                                type="number"
+                                value={optionCounts[type] ?? (type === QuestionType.MATCHING ? 5 : type === QuestionType.TRUE_FALSE ? 2 : 4)}
+                                onChange={(e) =>
+                                  setOptionCounts(prev => ({
+                                    ...prev,
+                                    [type]: Math.max(0, Math.min(8, parseInt(e.target.value) || 0))
+                                  }))
+                                }
+                                title={type === QuestionType.MATCHING ? 'ចំនួនគូផ្គូរផ្គង' : 'ចំនួនចម្លើយជ្រើសរើស'}
+                                className="w-10 text-center text-xs font-bold bg-emerald-50 border border-emerald-200 text-emerald-700 rounded py-0.5"
+                                min={type === QuestionType.FILL_BLANKS ? '0' : '2'}
+                                max="8"
+                              />
+                            )}
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
                 </div>
               </div>
             </div>
@@ -982,6 +1034,26 @@ function QuestionCard({ question, index, isYoung, isIntermediate }: { question: 
           )}
 
           {question.type === QuestionType.TRUE_FALSE && (
+            question.options && question.options.length > 2 ? (
+              <div className="space-y-3 pl-2">
+                {question.options.map((opt, i) => {
+                  const cleanOpt = preprocessMathForDisplay(opt);
+                  const letter = String.fromCharCode(65 + i);
+                  return (
+                    <div key={i} className="flex items-start gap-4 text-lg font-medium text-slate-700">
+                      <div className={`w-7 h-7 rounded-full ${isYoung ? 'border-2 border-dashed' : isIntermediate ? 'border-2 border-indigo-200' : 'border-2'} border-slate-300 shrink-0 flex items-center justify-center bg-slate-50 text-[11px] font-extrabold text-slate-500`}>
+                        {letter}
+                      </div>
+                      <div className={`markdown-body ${isYoung || isIntermediate ? 'text-slate-800' : ''} flex-1 pt-0.5`}>
+                        <ReactMarkdown remarkPlugins={[remarkMath]} rehypePlugins={[rehypeKatex]}>
+                          {cleanOpt}
+                        </ReactMarkdown>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            ) : (
              <div className="flex flex-col gap-4 pl-2 sm:flex-row sm:gap-10">
                 <div className="flex items-center gap-3 text-lg font-medium text-slate-700">
                   <div className={`w-7 h-7 rounded-full ${isYoung ? 'border-2 border-dashed' : isIntermediate ? 'border-2 border-indigo-200' : 'border-2'} border-slate-300 shrink-0 flex items-center justify-center bg-slate-50 text-[11px] font-extrabold text-slate-500`}>
@@ -996,6 +1068,7 @@ function QuestionCard({ question, index, isYoung, isIntermediate }: { question: 
                   <span>មិនត្រឹមត្រូវ (False)</span>
                 </div>
              </div>
+            )
           )}
 
           {question.type === QuestionType.FILL_BLANKS && (

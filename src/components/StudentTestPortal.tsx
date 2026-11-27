@@ -12,7 +12,9 @@ import {
   User,
   Hash,
   Award,
-  AlertCircle
+  AlertCircle,
+  Upload,
+  X
 } from 'lucide-react';
 import { School, SavedTest, Question, QuestionType, StudentSubmission, StudentRecord } from '../types';
 import { fetchTests, fetchSubjects, submitStudentTest, fetchStudents, countStudentAttempts } from '../services/dbService';
@@ -57,6 +59,10 @@ function isQuestionCorrect(
   }
 
   if (q.type === QuestionType.TRUE_FALSE) {
+    if (q.options && q.options.length > 2) {
+      const expectedLetter = resolveMcqLetter(q);
+      return typeof studentVal === 'string' && studentVal.toUpperCase() === expectedLetter;
+    }
     const raw = typeof q.answer === 'string' ? normalizeAnswerStr(q.answer) : '';
     const expected = raw === 'true' || raw === 'ត្រឹមត្រូវ' || raw === 'a' || raw === 'yes' ? 'A' : 'B';
     return typeof studentVal === 'string' && studentVal.toUpperCase() === expected;
@@ -374,6 +380,37 @@ export const StudentTestPortal: React.FC<StudentTestPortalProps> = ({ school, on
 
                 {/* True / False */}
                 {q.type === QuestionType.TRUE_FALSE && (
+                  q.options && q.options.length > 2 ? (
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pl-11">
+                      {q.options.map((opt, i) => {
+                        const letter = String.fromCharCode(65 + i);
+                        const selected = currentVal === letter;
+                        return (
+                          <button
+                            key={i}
+                            type="button"
+                            onClick={() => setAnswers(prev => ({ ...prev, [q.id]: letter }))}
+                            className={`text-left p-3.5 rounded-xl border-2 transition-all flex items-start gap-3 cursor-pointer ${
+                              selected
+                                ? 'border-blue-600 bg-blue-50/70 text-blue-900'
+                                : 'border-slate-200 hover:border-blue-300 bg-white text-slate-700'
+                            }`}
+                          >
+                            <span className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-extrabold shrink-0 ${
+                              selected ? 'bg-blue-600 text-white' : 'bg-slate-100 text-slate-600'
+                            }`}>
+                              {letter}
+                            </span>
+                            <div className="text-sm font-medium markdown-body pt-0.5">
+                              <ReactMarkdown remarkPlugins={[remarkMath]} rehypePlugins={[rehypeKatex]}>
+                                {preprocessMathForDisplay(opt)}
+                              </ReactMarkdown>
+                            </div>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  ) : (
                   <div className="flex flex-wrap gap-3 pl-11">
                     {[
                       { letter: 'A', label: 'ត្រឹមត្រូវ (True)' },
@@ -399,6 +436,7 @@ export const StudentTestPortal: React.FC<StudentTestPortalProps> = ({ school, on
                       );
                     })}
                   </div>
+                  )
                 )}
 
                 {/* Fill in Blanks */}
@@ -488,7 +526,7 @@ export const StudentTestPortal: React.FC<StudentTestPortalProps> = ({ school, on
 
                 {/* Short & Long Answer */}
                 {(q.type === QuestionType.SHORT_ANSWER || q.type === QuestionType.LONG_ANSWER) && (
-                  <div className="pl-11">
+                  <div className="pl-11 space-y-3">
                     {q.type === QuestionType.SHORT_ANSWER ? (
                       <input
                         type="text"
@@ -505,6 +543,69 @@ export const StudentTestPortal: React.FC<StudentTestPortalProps> = ({ school, on
                         placeholder="សរសេរចម្លើយក្បោះក្បាយនៅទីនេះ..."
                         className="w-full px-4 py-3 border border-slate-200 rounded-xl text-sm focus:outline-none focus:border-blue-500"
                       />
+                    )}
+                    {q.allowImageUpload && (
+                      <div className="space-y-2">
+                        <label className="inline-flex items-center gap-2 px-4 py-2 bg-blue-50 hover:bg-blue-100 text-blue-700 border border-blue-200 rounded-xl text-xs font-bold cursor-pointer">
+                          <Upload className="w-4 h-4" />
+                          <span>Upload រូបភាពចម្លើយ (.jpg)</span>
+                          <input
+                            type="file"
+                            accept="image/jpeg,image/jpg,image/png"
+                            hidden
+                            onChange={(e) => {
+                              const file = e.target.files?.[0];
+                              if (!file) return;
+                              const reader = new FileReader();
+                              reader.onload = () => {
+                                const img = new Image();
+                                img.onload = () => {
+                                  const maxW = 1000;
+                                  let w = img.width;
+                                  let h = img.height;
+                                  if (w > maxW) {
+                                    h = Math.round((h * maxW) / w);
+                                    w = maxW;
+                                  }
+                                  const canvas = document.createElement('canvas');
+                                  canvas.width = w;
+                                  canvas.height = h;
+                                  const ctx = canvas.getContext('2d');
+                                  if (ctx) {
+                                    ctx.drawImage(img, 0, 0, w, h);
+                                    const dataUrl = canvas.toDataURL('image/jpeg', 0.78);
+                                    setAnswers(prev => ({ ...prev, [`${q.id}__img`]: dataUrl }));
+                                  }
+                                };
+                                img.src = reader.result as string;
+                              };
+                              reader.readAsDataURL(file);
+                            }}
+                          />
+                        </label>
+                        {typeof answers[`${q.id}__img`] === 'string' && (
+                          <div className="relative inline-block">
+                            <img
+                              src={answers[`${q.id}__img`] as string}
+                              alt="ចម្លើយសិស្ស"
+                              className="max-h-48 rounded-xl border border-slate-200 shadow-sm"
+                            />
+                            <button
+                              type="button"
+                              onClick={() =>
+                                setAnswers(prev => {
+                                  const next = { ...prev };
+                                  delete next[`${q.id}__img`];
+                                  return next;
+                                })
+                              }
+                              className="absolute -top-2 -right-2 p-1 bg-rose-600 text-white rounded-full shadow cursor-pointer"
+                            >
+                              <X className="w-3.5 h-3.5" />
+                            </button>
+                          </div>
+                        )}
+                      </div>
                     )}
                   </div>
                 )}

@@ -230,8 +230,13 @@ async function callWithTimeout<T>(promise: Promise<T>, ms = 60000): Promise<T> {
 }
 
 export async function generateTest(options: TestGeneratorOptions): Promise<GeneratedTest> {
-  const { grade, subject, material, images, questionCounts, difficultyDistribution, apiKey } = options;
+  const { grade, subject, material, images, questionCounts, optionCounts, allowImageUpload, difficultyDistribution, apiKey } = options;
   const resolvedKey = resolveApiKey(apiKey);
+
+  const mcCount = optionCounts?.[QuestionType.MULTIPLE_CHOICE] || 4;
+  const tfCount = optionCounts?.[QuestionType.TRUE_FALSE] || 2;
+  const matchCount = optionCounts?.[QuestionType.MATCHING] || 5;
+  const fillCount = optionCounts?.[QuestionType.FILL_BLANKS] ?? 4;
 
   const prompt = `
     You are a professional Khmer teacher assistant. Generate a monthly/semester test in Khmer based on the provided material.
@@ -268,11 +273,12 @@ export async function generateTest(options: TestGeneratorOptions): Promise<Gener
     6. Distractors: For Multiple Choice, True/False, and Matching, provide plausible distractors (incorrect answers) to make it challenging.
     7. Quality: Ensure questions are pedagogically sound for grade ${grade}.
     8. Formatting: Output in the specified JSON format.
-    9. For Multiple Choice: Provide exactly 4 options. The options represent choices A, B, C, D in order. The 'answer' field can be either the index letter ('A', 'B', 'C', 'D') or the full text of the correct option.
-    10. For True/False (ខុសត្រូវ): Provide exactly 2 options: ["ត្រឹមត្រូវ", "មិនត្រឹមត្រូវ"] representing A and B. The 'answer' field can be 'A' / 'ត្រឹមត្រូវ' or 'B' / 'មិនត្រឹមត្រូវ'.
-    11. For Fill in the blanks (បំពេញចន្លោះ): indicate where the blank is with "........". You can also optionally provide 4 options representing A, B, C, D to fill the blank.
-    12. DO NOT provide hundreds of options or repetitive data. Keep the output focused and professional.
-    13. Question Order: Strictly arrange questions in this order by group: 1. True/False (ខុសត្រូវ), 2. Matching (ផ្គូរផ្គង), 3. Multiple Choice (ពហុជ្រើសរើស), 4. Fill in the blanks (បំពេញចន្លោះ), 5. Short Answer (ចំណួរចម្លើយខ្លី), 6. Long Answer (សំណួរចម្លើយវែង).
+    9. For Multiple Choice (ពហុជ្រើសរើស): Provide exactly ${mcCount} options (choices A, B, C, ... in order). The 'answer' field should be the index letter ('A', 'B', 'C', ...) or the full text of the correct option.
+    10. For True/False (ខុសត្រូវ): Provide exactly ${tfCount} options.${tfCount === 2 ? ' Use ["ត្រឹមត្រូវ", "មិនត្រឹមត្រូវ"] representing A and B.' : ` Provide ${tfCount} statements/choices (A, B, C, ...) for the student to choose which statement is true/correct.`} The 'answer' field should be the correct letter ('A', 'B', ...).
+    11. For Matching (ផ្គូរផ្គង): Provide exactly ${matchCount} matchingPairs per matching question.
+    12. For Fill in the blanks (បំពេញចន្លោះ): indicate where the blank is with "........". ${fillCount > 0 ? `Provide exactly ${fillCount} options representing choices to fill the blank.` : 'Do not provide options (open blank).'}
+    13. DO NOT provide hundreds of options or repetitive data. Keep the output focused and professional.
+    14. Question Order: Strictly arrange questions in this order by group: 1. True/False (ខុសត្រូវ), 2. Matching (ផ្គូរផ្គង), 3. Multiple Choice (ពហុជ្រើសរើស), 4. Fill in the blanks (បំពេញចន្លោះ), 5. Short Answer (ចំណួរចម្លើយខ្លី), 6. Long Answer (សំណួរចម្លើយវែង).
     
     The material is provided below (and in images if attached).
      Material:
@@ -306,8 +312,17 @@ export async function generateTest(options: TestGeneratorOptions): Promise<Gener
 
   try {
     const result = JSON.parse(response.text);
+    const questions = Array.isArray(result.questions)
+      ? result.questions.map((q: Question) => ({
+          ...q,
+          allowImageUpload:
+            (q.type === QuestionType.SHORT_ANSWER || q.type === QuestionType.LONG_ANSWER) &&
+            Boolean(allowImageUpload?.[q.type]),
+        }))
+      : [];
     return {
       ...result,
+      questions,
       grade,
       subject
     };

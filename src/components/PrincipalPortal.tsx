@@ -1081,6 +1081,7 @@ export const PrincipalPortal: React.FC<PrincipalPortalProps> = ({
                       : String(rawAns || 'មិនបានឆ្លើយ');
                   const formattedCorrect =
                     typeof q.answer === 'object' ? JSON.stringify(q.answer) : String(q.answer || '');
+                  const rawImg = viewingSubmission.answers?.[`${q.id}__img`];
                   return (
                     <div key={q.id} className="p-4 rounded-2xl border border-slate-200 bg-slate-50/50 space-y-2">
                       <p className="font-bold text-sm text-slate-900">
@@ -1094,6 +1095,11 @@ export const PrincipalPortal: React.FC<PrincipalPortalProps> = ({
                           ចម្លើយត្រឹមត្រូវ៖ {formattedCorrect}
                         </span>
                       </div>
+                      {typeof rawImg === 'string' && rawImg.startsWith('data:image/') && (
+                        <div className="pt-2">
+                          <img src={rawImg} alt="រូបភាពចម្លើយសិស្ស" className="max-h-64 rounded-xl border border-slate-200 shadow-sm" />
+                        </div>
+                      )}
                     </div>
                   );
                 });

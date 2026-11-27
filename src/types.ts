@@ -29,6 +29,7 @@ export interface Question {
   answer: string | string[] | { [key: string]: string };
   explanation?: string;
   svg?: string; // Optional SVG code for diagrams or illustrations (e.g. math geometry, science charts)
+  allowImageUpload?: boolean; // Allow student to upload JPG answer for written questions
 }
 
 export interface TestGeneratorOptions {
@@ -37,6 +38,8 @@ export interface TestGeneratorOptions {
   material: string;
   images?: string[]; // Base64 strings
   questionCounts: { [key in QuestionType]?: number };
+  optionCounts?: { [key in QuestionType]?: number };
+  allowImageUpload?: { [key in QuestionType]?: boolean };
   difficultyDistribution: { [key in Difficulty]: number };
   apiKey?: string;
 }

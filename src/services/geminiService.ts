@@ -258,13 +258,17 @@ export async function generateTest(options: TestGeneratorOptions): Promise<Gener
     Guidelines:
     1. Language: Use formal Khmer.
     2. Variety: strictly follow the question types requested.
-    3. Math Formatting: Use LaTeX for mathematical expressions to ensure they are high-quality. 
-       - Fractions: \frac{a}{b} (DO NOT wrap fractions in parentheses like (\frac{a}{b}), just use \frac{a}{b})
-       - Numbers: DO NOT wrap plain numbers, integers, decimals, or simple percentages (like 5, 12, 3.5, 20%) in $...$! Write plain numbers directly without dollar signs.
-       - Exponents: x^{2}
-       - Degrees: 90^{\circ}
-       - Roots: \sqrt{x}
-       Only wrap complex LaTeX formulas/expressions in $...$ (never put spaces right after opening $ or right before closing $).
+    3. Math & Science Formula Formatting (LaTeX):
+       - Mathematics (គណិតវិទ្យា): Use proper LaTeX ($...$ or $$...$$) for ALL math formulas, equations, and expressions:
+         * Fractions: \frac{a}{b} (DO NOT wrap fractions in parentheses like (\frac{a}{b}), just use \frac{a}{b})
+         * Exponents / Powers: x^{2}, a^{n}, 10^{-3}
+         * Square roots / Nth roots: \sqrt{x}, \sqrt{a^{2}+b^{2}}, \sqrt[3]{x}
+         * Degrees & Symbols: 90^{\circ}, \pi, \leq, \geq, \neq, \times, \div, \vec{v}
+         * Plain standalone numbers (like 5, 12, 3.5, 20%) without formulas should be written directly without $...$.
+       - Chemistry (គីមីវិទ្យា): Format all chemical formulas, ions, and reaction equations in LaTeX wrapped in parentheses when inline in Khmer text, e.g., ($H_{2}O$), ($H_{2}SO_{4}$), ($CO_{2}$), ($Ca^{2+}$), ($2H_{2} + O_{2} \rightarrow 2H_{2}O$).
+       - Physics (រូបវិទ្យា): Format all physics formulas and equations in LaTeX wrapped in parentheses when inline, e.g., ($F = m \cdot a$), ($v = \frac{d}{t}$), ($E_{k} = \frac{1}{2}mv^{2}$), ($P = U \cdot I$), ($g = 9.8\text{ m/s}^{2}$).
+       - Biology (ជីវវិទ្យា): Format biological equations, chemical processes, and genetic notation in LaTeX wrapped in parentheses when inline, e.g., ($6CO_{2} + 6H_{2}O \rightarrow C_{6}H_{12}O_{6} + 6O_{2}$), ($ATP$), ($DNA$).
+       Never put spaces right after an opening $ or right before a closing $.
     4. For Grade 1-3 Math/Science:
        - If the question involves visual concepts (fractions, geometry, living things), GENERATE a simple SVG diagram in the 'svg' field.
        - SVG rules: Use viewBox="0 0 200 200", width="100%", height="auto". Keep it simple with strokes and fill.

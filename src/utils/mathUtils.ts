@@ -52,13 +52,15 @@ export function preprocessMathForDisplay(text: string): string {
   // Let's identify math statements that have no dollars.
   if (!processed.includes('$')) {
     // Match equations like: A = \frac{...}{...}, or simply expressions containing fractions/square roots
-    const formulaRegex = /(([A-Za-z0-9\s_+*\-\/()]+\s*=\s*)?\\(frac|sqrt|times|div|cdot|le|ge|neq|approx)\s*\{[^}]*\}[\s\w^{}+\-\/*%()={}]*)/g;
+    const formulaRegex = /(([A-Za-z0-9\s_+*\-\/()]+\s*=\s*)?\\(frac|sqrt|times|div|cdot|le|ge|neq|approx|rightarrow|vec)\s*\{[^}]*\}[\s\w^{}+\-\/*%()={}]*)/g;
     
     if (formulaRegex.test(processed)) {
       processed = processed.replace(formulaRegex, '$$$1$$');
     } else {
       // Check if there are raw \frac or \sqrt structures that aren't parts of large equations and wrap them
       processed = processed.replace(/(\\(frac|sqrt)\{[^}]*\}\{[^}]*\}|\\(frac|sqrt)\{[^}]*\})/g, '$$$1$$');
+      // Wrap raw LaTeX superscripts/subscripts like x^{2} or H_{2}O if still unwrapped
+      processed = processed.replace(/([A-Za-z0-9]+(?:\^\{[^}]+\}|_\{[^}]+\})+)/g, (_, expr) => `$${expr}$`);
     }
   }
 

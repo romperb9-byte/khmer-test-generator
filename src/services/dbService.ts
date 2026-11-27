@@ -265,13 +265,23 @@ export async function deleteTest(id: string): Promise<void> {
 
 export async function fetchSubmissions(schoolId: string): Promise<StudentSubmission[]> {
   if (isSupabaseConfigured && supabase) {
-    const { data, error } = await supabase
-      .from('submissions')
-      .select('*')
-      .eq('school_id', schoolId)
-      .order('submitted_at', { ascending: false });
-    if (error) throw new Error(error.message);
-    return (data || []) as StudentSubmission[];
+    const all: StudentSubmission[] = [];
+    const pageSize = 1000;
+    let from = 0;
+    while (true) {
+      const { data, error } = await supabase
+        .from('submissions')
+        .select('*')
+        .eq('school_id', schoolId)
+        .order('submitted_at', { ascending: false })
+        .range(from, from + pageSize - 1);
+      if (error) throw new Error(error.message);
+      const batch = (data || []) as StudentSubmission[];
+      all.push(...batch);
+      if (batch.length < pageSize) break;
+      from += pageSize;
+    }
+    return all;
   }
   return readLS<StudentSubmission[]>(LS_KEYS.SUBMISSIONS, []).filter(s => s.school_id === schoolId);
 }
@@ -333,14 +343,24 @@ export async function countStudentAttempts(
 
 export async function fetchStudents(schoolId: string): Promise<StudentRecord[]> {
   if (isSupabaseConfigured && supabase) {
-    const { data, error } = await supabase
-      .from('students')
-      .select('*')
-      .eq('school_id', schoolId)
-      .order('grade', { ascending: true })
-      .order('student_id', { ascending: true });
-    if (error) throw new Error(error.message);
-    return (data || []) as StudentRecord[];
+    const all: StudentRecord[] = [];
+    const pageSize = 1000;
+    let from = 0;
+    while (true) {
+      const { data, error } = await supabase
+        .from('students')
+        .select('*')
+        .eq('school_id', schoolId)
+        .order('grade', { ascending: true })
+        .order('student_id', { ascending: true })
+        .range(from, from + pageSize - 1);
+      if (error) throw new Error(error.message);
+      const batch = (data || []) as StudentRecord[];
+      all.push(...batch);
+      if (batch.length < pageSize) break;
+      from += pageSize;
+    }
+    return all;
   }
   return readLS<StudentRecord[]>(LS_KEYS.STUDENTS, []).filter(s => s.school_id === schoolId);
 }
@@ -363,10 +383,14 @@ export async function upsertStudents(
   if (cleanRows.length === 0) return;
 
   if (isSupabaseConfigured && supabase) {
-    const { error } = await supabase
-      .from('students')
-      .upsert(cleanRows, { onConflict: 'school_id,student_id' });
-    if (error) throw new Error(error.message);
+    const chunkSize = 500;
+    for (let i = 0; i < cleanRows.length; i += chunkSize) {
+      const chunk = cleanRows.slice(i, i + chunkSize);
+      const { error } = await supabase
+        .from('students')
+        .upsert(chunk, { onConflict: 'school_id,student_id' });
+      if (error) throw new Error(error.message);
+    }
     return;
   }
 

@@ -168,8 +168,7 @@ const RESPONSE_SCHEMA = {
           },
           distractors: { type: Type.ARRAY, items: { type: Type.STRING }, maxItems: 4 },
           answer: { type: Type.STRING },
-          explanation: { type: Type.STRING },
-          svg: { type: Type.STRING, description: "SVG code for a diagram or illustration if needed for the question (e.g. math geometry shape, science chart, symbolic icon for early grades). Use viewBox='0 0 200 200' and preserveAspectRatio='xMidYMid meet'. Limit code to essential paths/shapes." }
+          explanation: { type: Type.STRING }
         },
         required: ["id", "type", "difficulty", "question", "answer"]
       }
@@ -277,13 +276,9 @@ export async function generateTest(options: TestGeneratorOptions): Promise<Gener
        - Physics (រូបវិទ្យា): Format all physics formulas and equations in LaTeX wrapped in parentheses when inline, e.g., ($F = m \cdot a$), ($v = \frac{d}{t}$), ($E_{k} = \frac{1}{2}mv^{2}$), ($P = U \cdot I$), ($g = 9.8\text{ m/s}^{2}$).
        - Biology (ជីវវិទ្យា): Format biological equations, chemical processes, and genetic notation in LaTeX wrapped in parentheses when inline, e.g., ($6CO_{2} + 6H_{2}O \rightarrow C_{6}H_{12}O_{6} + 6O_{2}$), ($ATP$), ($DNA$).
        Never put spaces right after an opening $ or right before a closing $.
-    4. For Grade 1-3 Math/Science:
-       - If the question involves visual concepts (fractions, geometry, living things), GENERATE a simple SVG diagram in the 'svg' field.
-       - SVG rules: Use viewBox="0 0 200 200", width="100%", height="auto". Keep it simple with strokes and fill.
-       - Example: For a question about circles, generate a circle SVG. For 1/4 fraction, generate a circle with 1/4 slice colored.
-    5. Diagrams: If a question would benefit from a visual aid (e.g., triangle for geometry, cell diagram for biology, number line), generate an SVG illustration.
-    6. Distractors: For Multiple Choice, True/False, and Matching, provide plausible distractors (incorrect answers) to make it challenging.
-    7. Quality: Ensure questions are pedagogically sound for grade ${grade}.
+    4. Keep questions concise, clear, and pedagogically sound for grade ${grade}. Do NOT generate raw SVG or HTML strings.
+    5. Distractors: For Multiple Choice, True/False, and Matching, provide plausible distractors (incorrect answers) to make it challenging.
+    6. Quality: Ensure questions are pedagogically sound for grade ${grade}.
     8. Formatting: Output in the specified JSON format.
     9. For Multiple Choice (ពហុជ្រើសរើស): Provide exactly ${mcCount} options (choices A, B, C, ... in order). The 'answer' field should be the index letter ('A', 'B', 'C', ...) or the full text of the correct option.
     10. For True/False (ខុសត្រូវ): Provide exactly ${tfCount} options.${tfCount === 2 ? ' Use ["ត្រឹមត្រូវ", "មិនត្រឹមត្រូវ"] representing A and B.' : ` Provide ${tfCount} statements/choices (A, B, C, ...) for the student to choose which statement is true/correct.`} The 'answer' field should be the correct letter ('A', 'B', ...).

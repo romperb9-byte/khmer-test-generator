@@ -1208,10 +1208,10 @@ function QuestionCard({ question, index, isYoung, isIntermediate }: { question: 
               <ReactMarkdown remarkPlugins={[remarkMath]} rehypePlugins={[rehypeKatex]}>
                 {cleanQuestion}
               </ReactMarkdown>
-              {question.svg && (
+              {question.svg && question.svg.trim().startsWith('<svg') && question.svg.trim().endsWith('</svg>') && (
                 <div className="flex justify-center my-6 max-w-full overflow-hidden" dangerouslySetInnerHTML={{ __html: question.svg }} />
               )}
-              {!question.svg && renderGeometricShape()}
+              {(!question.svg || !question.svg.trim().startsWith('<svg')) && renderGeometricShape()}
             </div>
           </div>
 

@@ -21,7 +21,9 @@ import {
   Upload,
   FileSpreadsheet,
   Edit3,
-  X
+  X,
+  Cloud,
+  Copy
 } from 'lucide-react';
 import { saveAs } from 'file-saver';
 import * as XLSX from 'xlsx';
@@ -41,6 +43,7 @@ import {
   updateStudent,
   deleteStudent
 } from '../services/dbService';
+import { GOOGLE_APPS_SCRIPT_CODE, syncAllToGoogleSheet } from '../services/googleSyncService';
 import { OmrScanner } from './OmrScanner';
 
 interface PrincipalPortalProps {
@@ -63,7 +66,7 @@ export const PrincipalPortal: React.FC<PrincipalPortalProps> = ({
   const [showPasscode, setShowPasscode] = useState(false);
   const [authError, setAuthError] = useState<string | null>(null);
 
-  const [activeTab, setActiveTab] = useState<'tests' | 'omr' | 'scores' | 'students' | 'subjects' | 'codes'>('tests');
+  const [activeTab, setActiveTab] = useState<'tests' | 'omr' | 'scores' | 'students' | 'subjects' | 'codes' | 'google'>('tests');
   const [tests, setTests] = useState<SavedTest[]>([]);
   const [submissions, setSubmissions] = useState<StudentSubmission[]>([]);
   const [subjects, setSubjects] = useState<SubjectItem[]>([]);
@@ -87,6 +90,13 @@ export const PrincipalPortal: React.FC<PrincipalPortalProps> = ({
   const [editStudentGrade, setEditStudentGrade] = useState('');
   const [editStudentSchool, setEditStudentSchool] = useState('');
   const [limitTestId, setLimitTestId] = useState('');
+
+  // Google Sheet & Drive state
+  const [googleWebhookUrl, setGoogleWebhookUrl] = useState(school.google_webhook_url || '');
+  const [isSyncingGoogle, setIsSyncingGoogle] = useState(false);
+  const [googleSyncMsg, setGoogleSyncMsg] = useState<string | null>(null);
+  const [googleSyncErr, setGoogleSyncErr] = useState<string | null>(null);
+  const [copiedScript, setCopiedScript] = useState(false);
 
   // Access Codes state
   const [teacherCode, setTeacherCode] = useState(school.teacher_code || '1111');
@@ -312,6 +322,37 @@ export const PrincipalPortal: React.FC<PrincipalPortalProps> = ({
     setTests(prev => prev.map(t => (t.id === testId ? updated : t)));
   };
 
+  const handleSaveGoogleUrl = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setGoogleSyncErr(null);
+    setGoogleSyncMsg(null);
+    try {
+      const updated = await updateSchool(school.id, { google_webhook_url: googleWebhookUrl.trim() });
+      onSchoolUpdated?.(updated);
+      setGoogleSyncMsg('បានរក្សាទុកតំណភ្ជាប់ Google Sheet & Drive ដោយជោគជ័យ!');
+    } catch (err) {
+      setGoogleSyncErr(err instanceof Error ? err.message : 'មិនអាចរក្សាទុក URL បានទេ');
+    }
+  };
+
+  const handleSyncAllToGoogle = async () => {
+    if (!googleWebhookUrl.trim()) {
+      setGoogleSyncErr('សូមបញ្ចូល Google Apps Script Web App URL ជាមុនសិន!');
+      return;
+    }
+    setIsSyncingGoogle(true);
+    setGoogleSyncErr(null);
+    setGoogleSyncMsg(null);
+    try {
+      await syncAllToGoogleSheet(googleWebhookUrl.trim(), { submissions, students, tests });
+      setGoogleSyncMsg(`បានបញ្ជូនទិន្នន័យទាំងអស់ (ពិន្ទុ ${submissions.length}, សិស្ស ${students.length}, វិញ្ញាសា ${tests.length}) ទៅ Google Sheet ដោយជោគជ័យ!`);
+    } catch (err) {
+      setGoogleSyncErr(err instanceof Error ? err.message : 'មិនអាចភ្ជាប់ទៅ Google Sheet បានទេ');
+    } finally {
+      setIsSyncingGoogle(false);
+    }
+  };
+
   const filteredTests = tests.filter(t => {
     const gOk = testGradeFilter === 'ទាំងអស់' || t.grade === testGradeFilter;
     const sOk = testSubjectFilter === 'ទាំងអស់' || t.subject === testSubjectFilter;
@@ -482,6 +523,15 @@ export const PrincipalPortal: React.FC<PrincipalPortalProps> = ({
             >
               <KeyRound className="w-4 h-4" />
               <span>កំណត់លេខកូដ</span>
+            </button>
+            <button
+              onClick={() => setActiveTab('google')}
+              className={`px-3.5 py-2 rounded-xl text-xs font-bold flex items-center gap-1.5 cursor-pointer transition-all ${
+                activeTab === 'google' ? 'bg-emerald-600 text-white shadow-sm' : 'bg-emerald-50 text-emerald-700 hover:bg-emerald-100'
+              }`}
+            >
+              <Cloud className="w-4 h-4" />
+              <span>Google Sheet & Drive</span>
             </button>
             <button
               onClick={loadAllData}
@@ -693,6 +743,92 @@ export const PrincipalPortal: React.FC<PrincipalPortalProps> = ({
                 រក្សាទុកលេខកូដ
               </button>
             </form>
+          </div>
+        )}
+
+        {/* TAB GOOGLE SHEET & DRIVE */}
+        {activeTab === 'google' && (
+          <div className="space-y-6 max-w-4xl">
+            <div className="bg-white rounded-2xl border border-slate-200 p-6 shadow-sm space-y-5">
+              <div>
+                <h3 className="font-extrabold text-slate-900 text-base flex items-center gap-2">
+                  <Cloud className="w-5 h-5 text-emerald-600" />
+                  <span>ភ្ជាប់ Google Sheet & Google Drive</span>
+                </h3>
+                <p className="text-xs text-slate-500 mt-1 leading-relaxed">
+                  រូបភាពចម្លើយរបស់សិស្ស (.jpg) នឹងត្រូវរក្សាទុកក្នុង <strong>Google Drive</strong> របស់អ្នកដោយផ្ទាល់ (មិនផ្ទុកក្នុង Supabase ទេ) ហើយពិន្ទុ និងទិន្នន័យទាំងអស់នឹងបញ្ជូនទៅកាន់ <strong>Google Sheet</strong> ដោយស្វ័យប្រវត្តិ។
+                </p>
+              </div>
+
+              <form onSubmit={handleSaveGoogleUrl} className="space-y-3">
+                <label className="block text-xs font-bold text-slate-700">
+                  Google Apps Script Web App URL
+                </label>
+                <div className="flex flex-col sm:flex-row gap-2.5">
+                  <input
+                    type="url"
+                    value={googleWebhookUrl}
+                    onChange={(e) => setGoogleWebhookUrl(e.target.value)}
+                    placeholder="https://script.google.com/macros/s/...../exec"
+                    className="flex-1 px-4 py-2.5 border border-slate-200 rounded-xl text-xs font-mono focus:outline-none focus:border-emerald-500"
+                  />
+                  <button
+                    type="submit"
+                    className="px-5 py-2.5 bg-slate-900 hover:bg-slate-800 text-white text-xs font-bold rounded-xl cursor-pointer shrink-0"
+                  >
+                    រក្សាទុក URL
+                  </button>
+                  <button
+                    type="button"
+                    disabled={isSyncingGoogle || !googleWebhookUrl.trim()}
+                    onClick={handleSyncAllToGoogle}
+                    className="px-5 py-2.5 bg-emerald-600 hover:bg-emerald-700 disabled:bg-slate-300 text-white text-xs font-bold rounded-xl cursor-pointer shrink-0"
+                  >
+                    {isSyncingGoogle ? 'កំពុងបញ្ជូន...' : 'បញ្ជូនទិន្នន័យទាំងអស់ទៅ Sheet'}
+                  </button>
+                </div>
+              </form>
+
+              {googleSyncErr && (
+                <div className="p-3 bg-rose-50 border border-rose-200 rounded-xl text-xs text-rose-700 font-semibold">
+                  {googleSyncErr}
+                </div>
+              )}
+              {googleSyncMsg && (
+                <div className="p-3 bg-emerald-50 border border-emerald-200 rounded-xl text-xs text-emerald-700 font-semibold">
+                  {googleSyncMsg}
+                </div>
+              )}
+            </div>
+
+            <div className="bg-white rounded-2xl border border-slate-200 p-6 shadow-sm space-y-4">
+              <div className="flex items-center justify-between gap-3">
+                <div>
+                  <h4 className="font-extrabold text-slate-900 text-sm">របៀបដំឡើង Google Sheet & Drive (១ នាទី)</h4>
+                  <ol className="text-xs text-slate-600 mt-2 space-y-1 list-decimal list-inside">
+                    <li>បើក Google Sheet ថ្មី → ចុច <strong>Extensions → Apps Script</strong></li>
+                    <li>លុបកូដចាស់ រួចបិទភ្ជាប់កូដខាងក្រោម ហើយចុច Save</li>
+                    <li>ចុច <strong>Deploy → New deployment → Web app</strong> (Execute as: <strong>Me</strong>, Who has access: <strong>Anyone</strong>)</li>
+                    <li>ចម្លង <strong>Web app URL</strong> មកបិទភ្ជាប់ក្នុងប្រអប់ខាងលើ រួចចុច <strong>រក្សាទុក URL</strong></li>
+                  </ol>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => {
+                    navigator.clipboard.writeText(GOOGLE_APPS_SCRIPT_CODE);
+                    setCopiedScript(true);
+                    setTimeout(() => setCopiedScript(false), 2500);
+                  }}
+                  className="px-4 py-2 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 rounded-xl text-xs font-bold flex items-center gap-1.5 cursor-pointer shrink-0"
+                >
+                  <Copy className="w-3.5 h-3.5" />
+                  <span>{copiedScript ? 'បានចម្លង!' : 'ចម្លងកូដ'}</span>
+                </button>
+              </div>
+              <pre className="bg-slate-900 text-slate-100 p-4 rounded-xl text-[11px] overflow-x-auto max-h-64 font-mono">
+                {GOOGLE_APPS_SCRIPT_CODE}
+              </pre>
+            </div>
           </div>
         )}
 
@@ -1095,11 +1231,23 @@ export const PrincipalPortal: React.FC<PrincipalPortalProps> = ({
                           ចម្លើយត្រឹមត្រូវ៖ {formattedCorrect}
                         </span>
                       </div>
-                      {typeof rawImg === 'string' && rawImg.startsWith('data:image/') && (
-                        <div className="pt-2">
+                      {typeof rawImg === 'string' && (rawImg.startsWith('data:image/') || rawImg.startsWith('http')) ? (
+                        <div className="pt-2 space-y-1.5">
                           <img src={rawImg} alt="រូបភាពចម្លើយសិស្ស" className="max-h-64 rounded-xl border border-slate-200 shadow-sm" />
+                          {rawImg.startsWith('http') && (
+                            <a
+                              href={rawImg}
+                              target="_blank"
+                              rel="noreferrer"
+                              className="inline-block text-xs font-bold text-blue-600 hover:underline"
+                            >
+                              បើកមើលរូបភាពក្នុង Google Drive ↗
+                            </a>
+                          )}
                         </div>
-                      )}
+                      ) : typeof rawImg === 'string' && rawImg ? (
+                        <p className="text-xs text-amber-700 font-medium pt-1">{rawImg}</p>
+                      ) : null}
                     </div>
                   );
                 });

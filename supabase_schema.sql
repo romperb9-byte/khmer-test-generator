@@ -11,6 +11,7 @@ CREATE TABLE IF NOT EXISTS schools (
   principal_code TEXT NOT NULL DEFAULT '1234',
   teacher_code TEXT NOT NULL DEFAULT '1111',
   student_code TEXT NOT NULL DEFAULT '2222',
+  google_webhook_url TEXT DEFAULT '',
   description TEXT DEFAULT '',
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );

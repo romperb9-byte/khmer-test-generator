@@ -18,6 +18,7 @@ import {
 } from 'lucide-react';
 import { School, SavedTest, Question, QuestionType, StudentSubmission, StudentRecord } from '../types';
 import { fetchTests, fetchSubjects, submitStudentTest, fetchStudents, countStudentAttempts } from '../services/dbService';
+import { uploadImageToGoogleDrive, appendSubmissionToGoogleSheet } from '../services/googleSyncService';
 import { preprocessMathForDisplay, stripMathDollars } from '../utils/mathUtils';
 
 const GRADES = Array.from({ length: 12 }, (_, i) => `ថ្នាក់ទី ${i + 1}`);
@@ -206,6 +207,31 @@ export const StudentTestPortal: React.FC<StudentTestPortalProps> = ({ school, on
       });
       const scoreOutOf10 = Math.round(((correctCount / totalQ) * 10) * 100) / 100;
 
+      // Upload any JPG answers to Google Drive & strip raw base64 so Supabase storage stays clean
+      const sanitizedAnswers: Record<string, string | Record<number, string>> = {};
+      const driveImageLinks: string[] = [];
+      const webhookUrl = school.google_webhook_url?.trim();
+
+      for (const [k, v] of Object.entries(answers)) {
+        if (k.endsWith('__img') && typeof v === 'string' && v.startsWith('data:image/')) {
+          if (webhookUrl) {
+            try {
+              const fileName = `${studentId.trim()}_${activeTest.subject}_${k}.jpg`;
+              const { imageUrl, viewUrl } = await uploadImageToGoogleDrive(webhookUrl, v, fileName);
+              sanitizedAnswers[k] = imageUrl;
+              driveImageLinks.push(viewUrl);
+            } catch {
+              sanitizedAnswers[k] = 'មិនអាចផ្ទុករូបភាពទៅ Google Drive បានទេ';
+            }
+          } else {
+            // Do NOT store base64 image in Supabase when Google Drive is not configured
+            sanitizedAnswers[k] = 'មិនទាន់បានភ្ជាប់ Google Drive';
+          }
+        } else {
+          sanitizedAnswers[k] = v;
+        }
+      }
+
       const saved = await submitStudentTest({
         school_id: school.id,
         test_id: activeTest.id,
@@ -215,12 +241,17 @@ export const StudentTestPortal: React.FC<StudentTestPortalProps> = ({ school, on
         exam_month: activeTest.exam_month || examMonth || '',
         student_id: studentId.trim(),
         student_name: studentName.trim(),
-        answers,
+        answers: sanitizedAnswers,
         score: scoreOutOf10,
         total_points: 10,
         correct_count: correctCount,
         total_questions: totalQ,
       });
+
+      if (webhookUrl) {
+        appendSubmissionToGoogleSheet(webhookUrl, saved, driveImageLinks).catch(() => {});
+      }
+
       setSubmissionResult(saved);
       setStep('result');
     } catch (err) {

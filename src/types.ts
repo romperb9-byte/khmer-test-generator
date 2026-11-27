@@ -60,6 +60,7 @@ export interface School {
   principal_code: string;
   teacher_code?: string;
   student_code?: string;
+  google_webhook_url?: string;
   description?: string;
   created_at?: string;
 }

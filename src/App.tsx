@@ -56,6 +56,7 @@ import { SchoolHub } from './components/SchoolHub.tsx';
 import { PrincipalPortal } from './components/PrincipalPortal.tsx';
 import { StudentTestPortal } from './components/StudentTestPortal.tsx';
 import { preprocessMathForDisplay } from './utils/mathUtils.ts';
+import { getShuffledMatching } from './utils/matchingUtils.ts';
 
 const GRADES = Array.from({ length: 12 }, (_, i) => `ថ្នាក់ទី ${i + 1}`);
 const EXAM_MONTHS = ['ធ្នូ', 'មករា', 'កុម្ភៈ', 'មីនា', 'ឆមាស១', 'ឧសភា', 'មិថុនា', 'កក្កដា', 'សីហា', 'ឆមាស២'];
@@ -743,15 +744,15 @@ export default function App() {
 
           <div className="h-1/3 min-h-[200px] bg-white rounded-2xl shadow-sm border border-slate-200 flex flex-col overflow-hidden shrink-0 print:hidden transition-all focus-within:shadow-md focus-within:ring-1 focus-within:ring-blue-500/20">
             <div className="p-3 border-b border-slate-100 bg-slate-50/50 flex items-center justify-between">
-              <span className="text-[11px] font-bold text-slate-400 uppercase tracking-widest">បញ្ចូលអត្ថបទមេរៀន ឬបិទភ្ជាប់រូបភាព</span>
+              <span className="text-[11px] font-bold text-slate-400 uppercase tracking-widest">បញ្ចូលអត្ថបទមេរៀន ឬបិទភ្ជាប់រូបភាព / PDF</span>
               <div className="flex gap-2">
-                <button onClick={() => fileInputRef.current?.click()} className="p-1.5 hover:bg-blue-50 text-slate-400 rounded-md">
+                <button onClick={() => fileInputRef.current?.click()} title="Upload រូបភាព ឬ PDF" className="p-1.5 hover:bg-blue-50 text-slate-400 rounded-md cursor-pointer">
                    <Plus className="w-5 h-5" />
                 </button>
-                <button onClick={() => {setMaterial(''); setImages([]);}} className="p-1.5 hover:bg-rose-50 text-slate-400 rounded-md">
+                <button onClick={() => {setMaterial(''); setImages([]);}} className="p-1.5 hover:bg-rose-50 text-slate-400 rounded-md cursor-pointer">
                    <Trash2 className="w-5 h-5" />
                 </button>
-                <input type="file" hidden ref={fileInputRef} multiple accept="image/*" onChange={handleImageUpload} />
+                <input type="file" hidden ref={fileInputRef} multiple accept="image/*,application/pdf" onChange={handleImageUpload} />
               </div>
             </div>
             <div className="flex-1 relative flex flex-col">
@@ -779,8 +780,15 @@ export default function App() {
                 <div className="absolute bottom-3 left-3 right-3 flex gap-2 overflow-x-auto p-2 bg-white/80 backdrop-blur rounded-xl border border-slate-100">
                   {images.map((img, idx) => (
                     <div key={idx} className="relative group shrink-0">
-                      <img src={img} className="h-14 w-14 object-cover rounded-md border border-slate-200" />
-                      <button onClick={() => removeImage(idx)} className="absolute -top-1 -right-1 bg-rose-500 text-white rounded-full p-0.5 opacity-0 group-hover:opacity-100">
+                      {img.startsWith('data:application/pdf') ? (
+                        <div className="h-14 px-3 bg-rose-50 border border-rose-200 rounded-md flex items-center gap-1.5 text-rose-700 text-xs font-bold">
+                          <FileText className="w-4 h-4 shrink-0" />
+                          <span>PDF #{idx + 1}</span>
+                        </div>
+                      ) : (
+                        <img src={img} className="h-14 w-14 object-cover rounded-md border border-slate-200" />
+                      )}
+                      <button onClick={() => removeImage(idx)} className="absolute -top-1 -right-1 bg-rose-500 text-white rounded-full p-0.5 opacity-0 group-hover:opacity-100 cursor-pointer">
                         <X className="w-2.5 h-2.5" />
                       </button>
                     </div>
@@ -1338,8 +1346,8 @@ function QuestionCard({ question, index, isYoung, isIntermediate }: { question: 
                   </thead>
                   <tbody>
                      {(() => {
-                        const rightList = [...question.matchingPairs, ...(question.distractors || []).map(d => ({ left: '', right: d }))];
-                        const maxLength = Math.max(question.matchingPairs.length, rightList.length);
+                        const { rightItems } = getShuffledMatching(question);
+                        const maxLength = Math.max(question.matchingPairs.length, rightItems.length);
                         const rows = [];
                         for (let i = 0; i < maxLength; i++) {
                            rows.push(
@@ -1351,7 +1359,7 @@ function QuestionCard({ question, index, isYoung, isIntermediate }: { question: 
                                  </td>
                                  <td className="border border-black p-3 text-base markdown-body">
                                     <ReactMarkdown remarkPlugins={[remarkMath]} rehypePlugins={[rehypeKatex]}>
-                                       {rightList[i] ? `${String.fromCharCode(65 + i)}. ${preprocessMathForDisplay(rightList[i].right)}` : ""}
+                                       {rightItems[i] ? `${String.fromCharCode(65 + i)}. ${preprocessMathForDisplay(rightItems[i].right)}` : ""}
                                     </ReactMarkdown>
                                  </td>
                                  <td className="border border-black p-3 text-base font-bold">

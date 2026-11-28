@@ -177,6 +177,17 @@ const RESPONSE_SCHEMA = {
   required: ["title", "questions"]
 };
 
+async function prepareAttachmentPart(dataUrl: string, maxWidth = 1400): Promise<{ mimeType: string; data: string }> {
+  if (dataUrl.startsWith('data:application/pdf')) {
+    const parts = dataUrl.split(',');
+    return {
+      mimeType: 'application/pdf',
+      data: parts[1] || parts[0],
+    };
+  }
+  return compressImageBase64(dataUrl, maxWidth);
+}
+
 async function compressImageBase64(dataUrl: string, maxWidth = 1400): Promise<{ mimeType: string; data: string }> {
   if (typeof document === 'undefined') {
     const parts = dataUrl.split(",");
@@ -252,7 +263,8 @@ export async function generateTest(options: TestGeneratorOptions): Promise<Gener
     Subject: ${subject}
 
     CRITICAL RULES FOR COPYING/TRANSCRIBING:
-    1. DO NOT invent new questions or rewrite/alter the meaning of the original question prompts! Keep the original Khmer wording, numbers, and content faithful to the source.
+    1. Extract ONLY the exam questions/prompts (ប្រធានវិញ្ញាសា) from the pasted text, images, or PDF! Ignore school headers, student name/date/signature blanks, page numbers, and administrative boilerplate.
+    2. DO NOT invent new questions or rewrite/alter the meaning of the original question prompts! Keep the original Khmer wording, numbers, and content faithful to the source.
     2. Extract ALL questions present in the pasted test text/images in their original order.
     3. Classify each extracted question into the appropriate type:
        - ${QuestionType.TRUE_FALSE} (ខុសត្រូវ)
@@ -325,8 +337,8 @@ export async function generateTest(options: TestGeneratorOptions): Promise<Gener
   const contents: any[] = [{ text: prompt }];
   
   if (images && images.length > 0) {
-    const compressedList = await Promise.all(images.map(img => compressImageBase64(img)));
-    compressedList.forEach(({ mimeType, data }) => {
+    const preparedList = await Promise.all(images.map(img => prepareAttachmentPart(img)));
+    preparedList.forEach(({ mimeType, data }) => {
       contents.push({
         inlineData: {
           mimeType,

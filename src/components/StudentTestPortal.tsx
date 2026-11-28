@@ -20,6 +20,7 @@ import { School, SavedTest, Question, QuestionType, StudentSubmission, StudentRe
 import { fetchTests, fetchSubjects, submitStudentTest, fetchStudents, countStudentAttempts } from '../services/dbService';
 import { uploadImageToGoogleDrive, appendSubmissionToGoogleSheet } from '../services/googleSyncService';
 import { preprocessMathForDisplay, stripMathDollars } from '../utils/mathUtils';
+import { getShuffledMatching } from '../utils/matchingUtils';
 
 const GRADES = Array.from({ length: 12 }, (_, i) => `ថ្នាក់ទី ${i + 1}`);
 const EXAM_MONTHS = ['ធ្នូ', 'មករា', 'កុម្ភៈ', 'មីនា', 'ឆមាស១', 'ឧសភា', 'មិថុនា', 'កក្កដា', 'សីហា', 'ឆមាស២'];
@@ -80,9 +81,9 @@ function isQuestionCorrect(
 
   if (q.type === QuestionType.MATCHING && q.matchingPairs) {
     if (typeof studentVal !== 'object') return false;
-    // Every left pair index i should match the letter of its right item in the combined list
+    const { correctLetterByLeftIndex } = getShuffledMatching(q);
     return q.matchingPairs.every((_, idx) => {
-      const expectedLetter = String.fromCharCode(65 + idx);
+      const expectedLetter = correctLetterByLeftIndex[idx] || String.fromCharCode(65 + idx);
       return (studentVal[idx] || '').toUpperCase() === expectedLetter;
     });
   }
@@ -517,10 +518,7 @@ export const StudentTestPortal: React.FC<StudentTestPortalProps> = ({ school, on
                 {q.type === QuestionType.MATCHING && q.matchingPairs && (
                   <div className="pl-11 space-y-3">
                     {(() => {
-                      const rightList = [
-                        ...q.matchingPairs,
-                        ...(q.distractors || []).map(d => ({ left: '', right: d }))
-                      ];
+                      const { rightItems } = getShuffledMatching(q);
                       const currentMap = (typeof currentVal === 'object' && currentVal !== null ? currentVal : {}) as Record<number, string>;
                       return q.matchingPairs.map((pair, pIdx) => (
                         <div key={pIdx} className="flex flex-col sm:flex-row sm:items-center gap-3 p-3 bg-slate-50 rounded-xl border border-slate-200">
@@ -540,7 +538,7 @@ export const StudentTestPortal: React.FC<StudentTestPortalProps> = ({ school, on
                             className="sm:w-64 px-3 py-2 bg-white border border-slate-300 rounded-lg text-xs font-semibold"
                           >
                             <option value="">-- ជ្រើសរើសចម្លើយផ្គូរផ្គង --</option>
-                            {rightList.map((r, rIdx) => {
+                            {rightItems.map((r, rIdx) => {
                               const letter = String.fromCharCode(65 + rIdx);
                               return (
                                 <option key={rIdx} value={letter}>

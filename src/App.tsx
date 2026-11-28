@@ -39,7 +39,8 @@ import {
   CheckCircle2,
   Eye,
   EyeOff,
-  Edit3
+  Edit3,
+  Copy
 } from 'lucide-react';
 import { Difficulty, QuestionType, TestGeneratorOptions, GeneratedTest, Question, School, SavedTest } from './types.ts';
 import { generateTest, getStoredGeminiApiKey, setStoredGeminiApiKey } from './services/geminiService.ts';
@@ -96,6 +97,7 @@ export default function App() {
     [QuestionType.LONG_ANSWER]: false,
   });
   const [isGenerating, setIsGenerating] = useState(false);
+  const [generatingMode, setGeneratingMode] = useState<'generate' | 'copy' | null>(null);
   const [showGoogleFormModal, setShowGoogleFormModal] = useState(false);
   const [googleFormExport, setGoogleFormExport] = useState<{ gsCode: string; htmlCode: string; googleFormCode: string } | null>(null);
   const [test, setTest] = useState<GeneratedTest | null>(null);
@@ -258,13 +260,15 @@ export default function App() {
     setQuestionCounts(prev => ({ ...prev, [type]: count }));
   };
 
-  const handleGenerate = async () => {
+  const handleGenerate = async (mode: 'generate' | 'copy' = 'generate') => {
     if (!material && images.length === 0) {
       setError('សូមបញ្ចូលអត្ថបទ ឬរូបភាពមេរៀនជាមុនសិន!');
       return;
     }
     
     setIsGenerating(true);
+    setGeneratingMode(mode);
+    setIsEditingTest(false);
     setError(null);
     try {
       const options: TestGeneratorOptions = {
@@ -280,31 +284,37 @@ export default function App() {
           [Difficulty.MEDIUM]: 60,
           [Difficulty.HARD]: 20,
         },
-        apiKey
+        apiKey,
+        mode
       };
       const result = await generateTest(options);
       
-      // Sort questions based on the requested order
-      const typeOrder = [
-        QuestionType.TRUE_FALSE,
-        QuestionType.MATCHING,
-        QuestionType.MULTIPLE_CHOICE,
-        QuestionType.FILL_BLANKS,
-        QuestionType.SHORT_ANSWER,
-        QuestionType.LONG_ANSWER
-      ];
+      if (mode === 'copy') {
+        setTest(result);
+      } else {
+        // Sort questions based on the requested order
+        const typeOrder = [
+          QuestionType.TRUE_FALSE,
+          QuestionType.MATCHING,
+          QuestionType.MULTIPLE_CHOICE,
+          QuestionType.FILL_BLANKS,
+          QuestionType.SHORT_ANSWER,
+          QuestionType.LONG_ANSWER
+        ];
 
-      const sortedQuestions = [...result.questions].sort((a, b) => {
-        const indexA = typeOrder.indexOf(a.type);
-        const indexB = typeOrder.indexOf(b.type);
-        return indexA - indexB;
-      });
+        const sortedQuestions = [...result.questions].sort((a, b) => {
+          const indexA = typeOrder.indexOf(a.type);
+          const indexB = typeOrder.indexOf(b.type);
+          return indexA - indexB;
+        });
 
-      setTest({ ...result, questions: sortedQuestions });
+        setTest({ ...result, questions: sortedQuestions });
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'មានបញ្ហាបច្ចេកទេស។ សូមព្យាយាមម្ដងទៀត!');
     } finally {
       setIsGenerating(false);
+      setGeneratingMode(null);
     }
   };
 
@@ -697,14 +707,23 @@ export default function App() {
             </div>
           </div>
           
-          <div className="p-6 border-t border-slate-100 bg-slate-50/30 space-y-3">
+          <div className="p-6 border-t border-slate-100 bg-slate-50/30 space-y-2.5">
             <button 
-              onClick={handleGenerate}
+              onClick={() => handleGenerate('generate')}
               disabled={isGenerating}
-              className="w-full bg-blue-600 hover:bg-blue-700 disabled:bg-slate-300 text-white font-bold py-3.5 px-4 rounded-xl shadow-lg shadow-blue-500/20 transition-all active:scale-95 flex items-center justify-center gap-3"
+              className="w-full bg-blue-600 hover:bg-blue-700 disabled:bg-slate-300 text-white font-bold py-3.5 px-4 rounded-xl shadow-lg shadow-blue-500/20 transition-all active:scale-95 flex items-center justify-center gap-3 cursor-pointer"
             >
-              {isGenerating ? <Loader2 className="w-5 h-5 animate-spin" /> : null}
-              <span>{isGenerating ? 'កំពុងបង្កើត...' : 'បង្កើតវិញ្ញាសាឥឡូវនេះ'}</span>
+              {isGenerating && generatingMode === 'generate' ? <Loader2 className="w-5 h-5 animate-spin" /> : null}
+              <span>{isGenerating && generatingMode === 'generate' ? 'កំពុងបង្កើត...' : 'បង្កើតវិញ្ញាសាឥឡូវនេះ'}</span>
+            </button>
+            <button 
+              onClick={() => handleGenerate('copy')}
+              disabled={isGenerating}
+              title="បំប្លែងអត្ថបទ ឬរូបភាពវិញ្ញាសាដែលបានបិទភ្ជាប់ មកជាវិញ្ញាសាក្នុងកម្មវិធីដោយរក្សាខ្លឹមសារដើម"
+              className="w-full bg-emerald-600 hover:bg-emerald-700 disabled:bg-slate-300 text-white font-bold py-3 px-4 rounded-xl shadow-md shadow-emerald-500/15 transition-all active:scale-95 flex items-center justify-center gap-2.5 cursor-pointer text-sm"
+            >
+              {isGenerating && generatingMode === 'copy' ? <Loader2 className="w-4 h-4 animate-spin" /> : <Copy className="w-4 h-4" />}
+              <span>{isGenerating && generatingMode === 'copy' ? 'កំពុងចម្លងវិញ្ញាសា...' : 'ចម្លងវិញ្ញាសា'}</span>
             </button>
           </div>
         </aside>

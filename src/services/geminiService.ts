@@ -237,7 +237,7 @@ async function callWithTimeout<T>(promise: Promise<T>, ms = 60000): Promise<T> {
 }
 
 export async function generateTest(options: TestGeneratorOptions): Promise<GeneratedTest> {
-  const { grade, subject, material, images, questionCounts, optionCounts, allowImageUpload, difficultyDistribution, apiKey } = options;
+  const { grade, subject, material, images, questionCounts, optionCounts, allowImageUpload, difficultyDistribution, apiKey, mode = 'generate' } = options;
   const resolvedKey = resolveApiKey(apiKey);
 
   const mcCount = optionCounts?.[QuestionType.MULTIPLE_CHOICE] || 4;
@@ -245,7 +245,35 @@ export async function generateTest(options: TestGeneratorOptions): Promise<Gener
   const matchCount = optionCounts?.[QuestionType.MATCHING] || 5;
   const fillCount = optionCounts?.[QuestionType.FILL_BLANKS] ?? 4;
 
-  const prompt = `
+  const copyPrompt = `
+    You are a professional Khmer exam digitizer. Your task is to TRANSCRIBE and CONVERT the pasted exam/test (from text and/or attached images) into the structured JSON test format, STRICTLY PRESERVING the original questions, wording, meaning, numbers, options, and order.
+
+    Target Grade: ${grade}
+    Subject: ${subject}
+
+    CRITICAL RULES FOR COPYING/TRANSCRIBING:
+    1. DO NOT invent new questions or rewrite/alter the meaning of the original question prompts! Keep the original Khmer wording, numbers, and content faithful to the source.
+    2. Extract ALL questions present in the pasted test text/images in their original order.
+    3. Classify each extracted question into the appropriate type:
+       - ${QuestionType.TRUE_FALSE} (ខុសត្រូវ)
+       - ${QuestionType.MATCHING} (ផ្គូរផ្គង)
+       - ${QuestionType.MULTIPLE_CHOICE} (ពហុជ្រើសរើស)
+       - ${QuestionType.FILL_BLANKS} (បំពេញចន្លោះ)
+       - ${QuestionType.SHORT_ANSWER} (ចម្លើយខ្លី)
+       - ${QuestionType.LONG_ANSWER} (ចម្លើយវែង)
+    4. Preserve all original options (for Multiple Choice, True/False, Fill in blanks) and matchingPairs (for Matching).
+    5. If the answer key is provided in the source, extract it accurately. If not provided, solve/determine the correct answer accurately.
+    6. Math & Science Formula Formatting (LaTeX):
+       - Use proper LaTeX ($...$ or $$...$$) for fractions (\\frac{a}{b}), exponents (x^{2}), square roots (\\sqrt{x}), and chemistry/physics/biology formulas (wrapped in parentheses when inline, e.g. ($H_{2}O$), ($F = m \\cdot a$)).
+       - Do NOT wrap plain standalone numbers (like 5, 12) in $...$.
+    7. Do NOT generate raw SVG or HTML strings.
+    8. Output MUST be in the specified JSON format.
+
+    Source Exam Material:
+    ${material}
+  `;
+
+  const generatePrompt = `
     You are a professional Khmer teacher assistant. Generate a monthly/semester test in Khmer based on the provided material.
     
     Target Grade: ${grade}
@@ -291,6 +319,8 @@ export async function generateTest(options: TestGeneratorOptions): Promise<Gener
      Material:
     ${material}
   `;
+
+  const prompt = mode === 'copy' ? copyPrompt : generatePrompt;
 
   const contents: any[] = [{ text: prompt }];
   

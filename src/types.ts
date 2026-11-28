@@ -42,6 +42,7 @@ export interface TestGeneratorOptions {
   allowImageUpload?: { [key in QuestionType]?: boolean };
   difficultyDistribution: { [key in Difficulty]: number };
   apiKey?: string;
+  mode?: 'generate' | 'copy';
 }
 
 export interface GeneratedTest {
